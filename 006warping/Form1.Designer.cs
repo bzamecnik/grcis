@@ -84,10 +84,11 @@
       this.numericParam.Size = new System.Drawing.Size( 79, 20 );
       this.numericParam.TabIndex = 3;
       this.numericParam.Value = new decimal( new int[] {
-            1,
+            50,
             0,
             0,
             0} );
+      this.numericParam.DecimalPlaces = 0;
       this.numericParam.ValueChanged += new System.EventHandler( this.numericParam_ValueChanged );
       // 
       // label1

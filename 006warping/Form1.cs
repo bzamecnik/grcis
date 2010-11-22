@@ -37,14 +37,21 @@ namespace _006warping
 
       inputImage = Image.FromFile( ofd.FileName );
 
-      recompute();
+      computeImage();
     }
 
-    private void recompute ()
+    private void computeImage ()
     {
       if ( inputImage == null ) return;
-
       pictureResult.SetPicture( (Bitmap)inputImage );
+    }
+
+    private void recompute()
+    {
+        if (inputImage == null) return;
+
+        pictureResult.MaxDistance = (double)numericParam.Value;
+        pictureResult.Invalidate();
     }
 
     private void buttonSave_Click ( object sender, EventArgs e )
