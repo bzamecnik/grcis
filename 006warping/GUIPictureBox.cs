@@ -13,10 +13,9 @@ namespace _006warping
   public partial class GUIPictureBox : PictureBox
   {
       public GUIPictureBox() {
-          features = new Features(this);
-          //Features.Add(new Feature{ StartPoint = new Point(100, 70), EndPoint = new Point(50, 120) });
-          //Features.Add(new Feature { StartPoint = new Point(50, 75), EndPoint = new Point(150, 200) });
-          featurePen = new Pen(FeaturesColor, 2.0f);
+          features = new Features();
+          featurePen = new Pen(FeatureColor, 2.0f);
+          activeFeaturePen = new Pen(ActiveFeatureColor, 3.0f);
           MaxDistance = 50.0f;
       }
 
@@ -34,23 +33,37 @@ namespace _006warping
     /// <summary>
     ///  Color to paint the features.
     /// </summary>
-    protected Color featuresColor = Color.LightGreen;
+    protected Color featureColor = Color.Gray;
+
+    private Pen featurePen;
+
+    protected Color activeFeatureColor = Color.Orange;
+
+    private Pen activeFeaturePen;
 
     /// <summary>
     /// Gets or sets the features' color.
     /// </summary>
-    public Color FeaturesColor
+    public Color FeatureColor
     {
-      get { return featuresColor; }
+      get { return featureColor; }
       set
       {
-        featuresColor = value;
+        featureColor = value;
         featurePen.Color = value;
         // !!! TODO: redraw the current features?
       }
     }
 
-    private Pen featurePen;
+    public Color ActiveFeatureColor
+    {
+        get { return activeFeatureColor; }
+        set
+        {
+            activeFeatureColor = value;
+            activeFeaturePen.Color = value;
+        }
+    }
 
     Features features;
 
@@ -82,7 +95,7 @@ namespace _006warping
 
     #region display results
 
-    protected override void OnPaint ( PaintEventArgs e )
+    protected override void OnPaint(PaintEventArgs e)
     {
         // custom drawing        
         Image = WarpImage(input, e.ClipRectangle);
@@ -148,7 +161,8 @@ namespace _006warping
 
     private void PaintFeatures(Graphics graphics, Features features) {
         foreach (Feature feature in features.List) {
-            graphics.DrawLine(featurePen, feature.StartPoint, feature.EndPoint);
+            Pen pen = feature.Equals(features.ActiveFeature) ? activeFeaturePen : featurePen;
+            graphics.DrawLine(pen, feature.StartPoint, feature.EndPoint);
             graphics.FillRectangle(Brushes.Orange, feature.EndPoint.X - 3, feature.EndPoint.Y - 3, 5, 5);
         }
     }
@@ -205,13 +219,13 @@ namespace _006warping
           if (features.Count > 0)
           {
               Size shift = new Size(mouseDownPoint.X - e.Location.X, mouseDownPoint.Y - e.Location.Y);
-              Feature feature = features.List[features.Count - 1];
+              Feature feature = features.ActiveFeature;
               feature.Shift(shift);
-              Invalidate(new Rectangle(
-                  Math.Min(mouseDownPoint.X, e.Location.X),
-                  Math.Min(mouseDownPoint.Y, e.Location.Y),
-                  Math.Abs(mouseDownPoint.X - e.Location.X) + 1,
-                  Math.Abs(mouseDownPoint.Y - e.Location.Y) + 1));
+              //Invalidate(new Rectangle(
+              //    Math.Min(mouseDownPoint.X, e.Location.X),
+              //    Math.Min(mouseDownPoint.Y, e.Location.Y),
+              //    Math.Abs(mouseDownPoint.X - e.Location.X) + 1,
+              //    Math.Abs(mouseDownPoint.Y - e.Location.Y) + 1));
           }
       }
       UseWaitCursor = false;
@@ -226,10 +240,10 @@ namespace _006warping
 
       // !!! TODO: active contour?
       UseWaitCursor = true;
-      Invalidate( new Rectangle( Math.Min( mouseDownPoint.X, e.Location.X ),
-                                 Math.Min( mouseDownPoint.Y, e.Location.Y ),
-                                 Math.Abs( mouseDownPoint.X - e.Location.X ) + 1,
-                                 Math.Abs( mouseDownPoint.Y - e.Location.Y ) + 1 ) );
+      //Invalidate( new Rectangle( Math.Min( mouseDownPoint.X, e.Location.X ),
+      //                           Math.Min( mouseDownPoint.Y, e.Location.Y ),
+      //                           Math.Abs( mouseDownPoint.X - e.Location.X ) + 1,
+      //                           Math.Abs( mouseDownPoint.Y - e.Location.Y ) + 1 ) );
       UseWaitCursor = false;
     }
 
@@ -237,35 +251,33 @@ namespace _006warping
 
     #region keyboard events
 
-    protected override void OnKeyDown ( KeyEventArgs e )
+    public void KeyPressed(object sender, KeyEventArgs e)
     {
-      base.OnKeyDown( e );
-      KeyPressed( e.KeyCode );
-    }
-
-    public void KeyPressed ( Keys key )
-    {
+      Keys key = e.KeyCode;
       if ( key == Keys.Back )
       {
-        // !!! TODO: remove the last feature?
-          if (features.Count > 1)
-          {
-              Feature removedFeature = features.List[features.Count - 1];
-              features.List.RemoveAt(features.Count - 1);
-              Invalidate(removedFeature.BoundingBox);
-          }
-          
+          // remove the last feature
+          features.RemoveLast();
       }
 
       if ( key == Keys.Delete )
       {
-        // !!! TODO: remove the current feature?
-          if (features.Count > 0)
-          {
-              Feature removedFeature = features.List[features.Count];
-              features.List.RemoveAt(features.Count);
-              Invalidate(removedFeature.BoundingBox);
-          }
+          // remove the active feature
+          //Rectangle removedFeatureBoundingBox = features.ActiveFeature.BoundingBox;
+          features.RemoveActive();
+          //Invalidate(removedFeatureBoundingBox);
+      }
+
+      if (key == Keys.F)
+      {
+          // shift the active feature forward
+          features.ActiveFeatureIndex++;
+      }
+
+      if (key == Keys.B)
+      {
+          // shift the active feature backward
+          features.ActiveFeatureIndex--;
       }
     }
 
@@ -275,10 +287,7 @@ namespace _006warping
 
   class Features
   {
-      GUIPictureBox guiPictureBox;
-
-      public Features(GUIPictureBox guiPictureBox) {
-          this.guiPictureBox = guiPictureBox;
+      public Features() {
           List = new List<Feature>();
       }
 
@@ -292,10 +301,47 @@ namespace _006warping
           get { return List.Count; }
       }
 
+      private int activeFeatureIndex = 0;
+      public int ActiveFeatureIndex
+      {
+          get { return activeFeatureIndex;  }
+          set {
+              activeFeatureIndex = (List.Count > 0) ? value % List.Count : 0;
+              if (activeFeatureIndex < 0) {
+                  activeFeatureIndex += List.Count;
+              }
+          }
+      }
+
+      public Feature ActiveFeature {
+          get
+          {
+              return (List.Count > 0) ? List[ActiveFeatureIndex] : null;
+          }
+      }
+
       public void Add(Feature feature)
       {
           List.Add(feature);
-          guiPictureBox.Invalidate(feature.BoundingBox);
+          ActiveFeatureIndex = List.Count - 1;
+      }
+
+      public void RemoveActive()
+      {
+          if (List.Count > 0)
+          {
+              List.RemoveAt(ActiveFeatureIndex);
+              ActiveFeatureIndex--;
+          }
+      }
+
+      public void RemoveLast()
+      {
+          if (List.Count > 0)
+          {
+              List.RemoveAt(List.Count - 1);
+              ActiveFeatureIndex--;
+          }
       }
   }
   class Feature {

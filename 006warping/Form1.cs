@@ -16,6 +16,7 @@ namespace _006warping
     public Form1 ()
     {
       InitializeComponent();
+      this.KeyDown += new KeyEventHandler(pictureResult.KeyPressed);
     }
 
     private void buttonOpen_Click ( object sender, EventArgs e )
