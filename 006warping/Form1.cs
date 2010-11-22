@@ -49,9 +49,10 @@ namespace _006warping
 
     private void recompute()
     {
-        if (inputImage == null) return;
-
-        pictureResult.MaxDistance = (double)numericParam.Value;
+        if (inputImage == null)
+        {
+            return;
+        }
         pictureResult.Invalidate();
     }
 
@@ -72,7 +73,14 @@ namespace _006warping
 
     private void numericParam_ValueChanged ( object sender, EventArgs e )
     {
-      recompute();
+        pictureResult.MaxDistance = (double)numericParam.Value;
+        recompute();
+    }
+
+    private void checkBox1_CheckedChanged(object sender, EventArgs e)
+    {
+        pictureResult.DrawFeatures = drawFeaturesCheckBox.Checked;
+        recompute();
     }
   }
 }

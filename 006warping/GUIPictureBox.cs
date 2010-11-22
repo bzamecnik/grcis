@@ -17,6 +17,7 @@ namespace _006warping
           featurePen = new Pen(FeatureColor, 2.0f);
           activeFeaturePen = new Pen(ActiveFeatureColor, 3.0f);
           MaxDistance = 50.0f;
+          DrawFeatures = true;
       }
 
     #region data
@@ -69,6 +70,8 @@ namespace _006warping
 
     public double MaxDistance { get; set; }
 
+
+    public bool DrawFeatures { get; set; }
     #endregion
 
     #region set/get pictures
@@ -100,7 +103,15 @@ namespace _006warping
         // custom drawing        
         Image = WarpImage(input, e.ClipRectangle);
         base.OnPaint(e);
-        PaintFeatures(e.Graphics, features);
+        if (DrawFeatures)
+        {
+            foreach (Feature feature in features.List)
+            {
+                Pen pen = feature.Equals(features.ActiveFeature) ? activeFeaturePen : featurePen;
+                e.Graphics.DrawLine(pen, feature.StartPoint, feature.EndPoint);
+                e.Graphics.FillRectangle(Brushes.Orange, feature.EndPoint.X - 3, feature.EndPoint.Y - 3, 5, 5);
+            }
+        }
     }
 
     private Bitmap WarpImage(Bitmap inputImage, Rectangle clipRectangle)
@@ -157,14 +168,6 @@ namespace _006warping
             }
         }
         return warpedImage;
-    }
-
-    private void PaintFeatures(Graphics graphics, Features features) {
-        foreach (Feature feature in features.List) {
-            Pen pen = feature.Equals(features.ActiveFeature) ? activeFeaturePen : featurePen;
-            graphics.DrawLine(pen, feature.StartPoint, feature.EndPoint);
-            graphics.FillRectangle(Brushes.Orange, feature.EndPoint.X - 3, feature.EndPoint.Y - 3, 5, 5);
-        }
     }
 
     #endregion
