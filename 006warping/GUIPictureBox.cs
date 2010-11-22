@@ -13,7 +13,7 @@ namespace _006warping
   public partial class GUIPictureBox : PictureBox
   {
       public GUIPictureBox() {
-          Features = new List<Feature>();
+          features = new Features(this);
           //Features.Add(new Feature{ StartPoint = new Point(100, 70), EndPoint = new Point(50, 120) });
           //Features.Add(new Feature { StartPoint = new Point(50, 75), EndPoint = new Point(150, 200) });
           featurePen = new Pen(FeaturesColor, 2.0f);
@@ -52,11 +52,7 @@ namespace _006warping
 
     private Pen featurePen;
 
-    List<Feature> Features
-    {
-        get;
-        set;
-    }
+    Features features;
 
     public double MaxDistance { get; set; }
 
@@ -91,7 +87,7 @@ namespace _006warping
         // custom drawing        
         Image = WarpImage(input, e.ClipRectangle);
         base.OnPaint(e);
-        PaintFeatures(e.Graphics, Features);
+        PaintFeatures(e.Graphics, features);
     }
 
     private Bitmap WarpImage(Bitmap inputImage, Rectangle clipRectangle)
@@ -101,7 +97,7 @@ namespace _006warping
             return null;
         }
 
-        if (Features.Count < 1)
+        if (features.Count < 1)
         {
             return inputImage;
         }
@@ -118,7 +114,7 @@ namespace _006warping
                 bool isWarped = false;
                 double shiftX = 0.0;
                 double shiftY = 0.0;
-                foreach (Feature feature in Features)
+                foreach (Feature feature in features.List)
                 {
                     double distX = feature.EndPoint.X - x;
                     double distY = feature.EndPoint.Y - y;
@@ -128,8 +124,8 @@ namespace _006warping
                         isWarped = true;
                         double featureWeight = (MaxDistance - distance) / MaxDistance;
                         //double featureWeight = 0.5 + Math.Cos(distance * Math.PI / MaxDistance) * 0.5;
-                        shiftX += feature.Shift.Width * featureWeight;
-                        shiftY += feature.Shift.Height * featureWeight;
+                        shiftX += feature.Direction.Width * featureWeight;
+                        shiftY += feature.Direction.Height * featureWeight;
                     }
                 }
                 
@@ -150,8 +146,8 @@ namespace _006warping
         return warpedImage;
     }
 
-    private void PaintFeatures(Graphics graphics, List<Feature> features) {
-        foreach (Feature feature in features) {
+    private void PaintFeatures(Graphics graphics, Features features) {
+        foreach (Feature feature in features.List) {
             graphics.DrawLine(featurePen, feature.StartPoint, feature.EndPoint);
             graphics.FillRectangle(Brushes.Orange, feature.EndPoint.X - 3, feature.EndPoint.Y - 3, 5, 5);
         }
@@ -197,15 +193,8 @@ namespace _006warping
       // choose action according to the mouse button
       if ( e.Button == MouseButtons.Left )
       {
-        // !!! TODO: add new feature?
-        Features.Add(new Feature(mouseDownPoint, e.Location));
-        Bitmap bmp = (Bitmap)Image;
-        //bmp.SetPixel( mouseDownPoint.X, mouseDownPoint.Y, featuresColor );
-        //bmp.SetPixel( e.Location.X, e.Location.Y, featuresColor );
-        Invalidate( new Rectangle( Math.Min( mouseDownPoint.X, e.Location.X ),
-                                   Math.Min( mouseDownPoint.Y, e.Location.Y ),
-                                   Math.Abs( mouseDownPoint.X - e.Location.X ) + 1,
-                                   Math.Abs( mouseDownPoint.Y - e.Location.Y ) + 1 ) );
+        // add new feature
+        features.Add(new Feature(mouseDownPoint, e.Location));
         UseWaitCursor = false;
         return;
       }
@@ -213,12 +202,11 @@ namespace _006warping
       if ( e.Button == MouseButtons.Right )
       {
         // !!! TODO: shift the last feature?
-          if (Features.Count > 0)
+          if (features.Count > 0)
           {
               Size shift = new Size(mouseDownPoint.X - e.Location.X, mouseDownPoint.Y - e.Location.Y);
-              Feature feature = Features[Features.Count - 1];
-              feature.StartPoint -= shift;
-              feature.EndPoint -= shift;
+              Feature feature = features.List[features.Count - 1];
+              feature.Shift(shift);
               Invalidate(new Rectangle(
                   Math.Min(mouseDownPoint.X, e.Location.X),
                   Math.Min(mouseDownPoint.Y, e.Location.Y),
@@ -260,10 +248,10 @@ namespace _006warping
       if ( key == Keys.Back )
       {
         // !!! TODO: remove the last feature?
-          if (Features.Count > 1)
+          if (features.Count > 1)
           {
-              Feature removedFeature = Features[Features.Count - 1];
-              Features.RemoveAt(Features.Count - 1);
+              Feature removedFeature = features.List[features.Count - 1];
+              features.List.RemoveAt(features.Count - 1);
               Invalidate(removedFeature.BoundingBox);
           }
           
@@ -272,10 +260,10 @@ namespace _006warping
       if ( key == Keys.Delete )
       {
         // !!! TODO: remove the current feature?
-          if (Features.Count > 0)
+          if (features.Count > 0)
           {
-              Feature removedFeature = Features[Features.Count];
-              Features.RemoveAt(Features.Count);
+              Feature removedFeature = features.List[features.Count];
+              features.List.RemoveAt(features.Count);
               Invalidate(removedFeature.BoundingBox);
           }
       }
@@ -284,6 +272,32 @@ namespace _006warping
     #endregion
   }
 
+
+  class Features
+  {
+      GUIPictureBox guiPictureBox;
+
+      public Features(GUIPictureBox guiPictureBox) {
+          this.guiPictureBox = guiPictureBox;
+          List = new List<Feature>();
+      }
+
+      public List<Feature> List
+      {
+          get;
+          private set;
+      }
+
+      public int Count {
+          get { return List.Count; }
+      }
+
+      public void Add(Feature feature)
+      {
+          List.Add(feature);
+          guiPictureBox.Invalidate(feature.BoundingBox);
+      }
+  }
   class Feature {
       private Point startPoint;
       public Point StartPoint
@@ -291,7 +305,7 @@ namespace _006warping
           get { return startPoint; }
           set {
               startPoint = value;
-              shift = computeShift();
+              direction = computeDirection();
           }
       }
 
@@ -302,27 +316,17 @@ namespace _006warping
           set
           {
               endPoint = value;
-              shift = computeShift();
+              direction = computeDirection();
           }
       }
 
-      private Size computeShift()
+      private Size computeDirection()
       {
           return new Size (EndPoint.X - StartPoint.X, EndPoint.Y - StartPoint.Y);
       }
       
-      private Size shift;
-      public Size Shift { get { return shift; } private set { shift = value; } }
-
-      public Feature()
-          : this(new Point(0, 0), new Point(0, 0))
-      { }
-
-      public Feature(Point start, Point end)
-      {
-          StartPoint = start;
-          EndPoint = end;
-      }
+      private Size direction;
+      public Size Direction { get { return direction; } private set { direction = value; } }
 
       public Rectangle BoundingBox
       {
@@ -335,5 +339,21 @@ namespace _006warping
                   Math.Abs(StartPoint.Y - EndPoint.Y) + 1);
           }
       }
+
+      public Feature()
+          : this(new Point(0, 0), new Point(0, 0))
+      { }
+
+      public Feature(Point start, Point end)
+      {
+          StartPoint = start;
+          EndPoint = end;
+      }
+
+      public void Shift(Size shift) {
+          StartPoint -= shift;
+          EndPoint -= shift;
+      }
+
   }
 }
