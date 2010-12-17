@@ -1,0 +1,28 @@
+===== Komprese èernobílého obrázku =====
+
+Zkusit trasovat spojité oblasti - èáry, køivky.
+
+Základní algoritmus:
+- zjistit, která barva je ve vìtšinì (pozadí) a která v menšinì (èáry)
+	- (prùmìr celého obrázku < poèet pixelù) ? pozadí èerné : pozadí bílé
+	- zapsat tuto informaci do výstupu
+- popsat jednotlivé èáry
+	- BÚNO èáry jsou èerné
+	- procházek postupnì pixely
+		- napø. pøedpokládejme, že v bìžném skenovacím poøadí:
+			- pro všechny øádky shora dolù
+				- pro všechny sloupce zleva doprava
+		- vybrat nejbližší èerný pixel
+		- od nìj hledat, popisovat a mazat èáru
+			- postupnì hledat èerný pixel v následujícím okolí
+				- napø. ètyøokolí (vpravo, vpravo dole, dole, vlevo dole)
+			- jakmile máme èerný pixel, víme, kterým smìrem pokraèuje èára
+				- tuto informaci si zapamatujeme
+			- pixel smažeme barvou pozadí
+		- zapsat popis èáry do výstupu
+
+Další úpravy:
+- okolí nezkoumat ve stejném poøadí, ale toto poøadí predikovat
+	- napø. podle poslední volby smìru
+		- to by se mohlo hodit na delší èáry, které vedou jedním smìrem
+  
