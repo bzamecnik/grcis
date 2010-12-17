@@ -16,6 +16,7 @@ namespace _006warping
     public Form1 ()
     {
       InitializeComponent();
+      this.KeyDown += new KeyEventHandler(pictureResult.KeyPressed);
     }
 
     private void buttonOpen_Click ( object sender, EventArgs e )
@@ -37,14 +38,22 @@ namespace _006warping
 
       inputImage = Image.FromFile( ofd.FileName );
 
-      recompute();
+      computeImage();
     }
 
-    private void recompute ()
+    private void computeImage ()
     {
       if ( inputImage == null ) return;
-
       pictureResult.SetPicture( (Bitmap)inputImage );
+    }
+
+    private void recompute()
+    {
+        if (inputImage == null)
+        {
+            return;
+        }
+        pictureResult.Invalidate();
     }
 
     private void buttonSave_Click ( object sender, EventArgs e )
@@ -64,7 +73,14 @@ namespace _006warping
 
     private void numericParam_ValueChanged ( object sender, EventArgs e )
     {
-      recompute();
+        pictureResult.MaxDistance = (double)numericParam.Value;
+        recompute();
+    }
+
+    private void checkBox1_CheckedChanged(object sender, EventArgs e)
+    {
+        pictureResult.DrawFeatures = drawFeaturesCheckBox.Checked;
+        recompute();
     }
   }
 }
