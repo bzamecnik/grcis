@@ -129,7 +129,7 @@
       // 
       this.labelElapsed.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
       this.labelElapsed.AutoSize = true;
-      this.labelElapsed.Location = new System.Drawing.Point( 457, 444 );
+      this.labelElapsed.Location = new System.Drawing.Point( 457, 442 );
       this.labelElapsed.Name = "labelElapsed";
       this.labelElapsed.Size = new System.Drawing.Size( 48, 13 );
       this.labelElapsed.TabIndex = 8;
@@ -139,7 +139,7 @@
       // 
       this.label3.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
       this.label3.AutoSize = true;
-      this.label3.Location = new System.Drawing.Point( 14, 444 );
+      this.label3.Location = new System.Drawing.Point( 14, 440 );
       this.label3.Name = "label3";
       this.label3.Size = new System.Drawing.Size( 31, 13 );
       this.label3.TabIndex = 10;
@@ -165,7 +165,8 @@
       // 
       // buttonStop
       // 
-      this.buttonStop.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+      this.buttonStop.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+      this.buttonStop.Enabled = false;
       this.buttonStop.Location = new System.Drawing.Point( 324, 436 );
       this.buttonStop.Name = "buttonStop";
       this.buttonStop.Size = new System.Drawing.Size( 110, 23 );
@@ -176,7 +177,7 @@
       // 
       // buttonStart
       // 
-      this.buttonStart.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+      this.buttonStart.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
       this.buttonStart.Location = new System.Drawing.Point( 324, 405 );
       this.buttonStart.Name = "buttonStart";
       this.buttonStart.Size = new System.Drawing.Size( 110, 23 );
