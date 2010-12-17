@@ -36,6 +36,8 @@
         this.labelResult = new System.Windows.Forms.Label();
         this.buttonLoad = new System.Windows.Forms.Button();
         this.checkDiff = new System.Windows.Forms.CheckBox();
+        this.label1 = new System.Windows.Forms.Label();
+        this.dominantColorLabel = new System.Windows.Forms.Label();
         this.panel1.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
         this.SuspendLayout();
@@ -50,7 +52,7 @@
         this.panel1.Controls.Add(this.pictureBox1);
         this.panel1.Location = new System.Drawing.Point(13, 13);
         this.panel1.Name = "panel1";
-        this.panel1.Size = new System.Drawing.Size(680, 410);
+        this.panel1.Size = new System.Drawing.Size(877, 410);
         this.panel1.TabIndex = 0;
         // 
         // pictureBox1
@@ -65,7 +67,7 @@
         // buttonSave
         // 
         this.buttonSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonSave.Location = new System.Drawing.Point(585, 439);
+        this.buttonSave.Location = new System.Drawing.Point(782, 439);
         this.buttonSave.Name = "buttonSave";
         this.buttonSave.Size = new System.Drawing.Size(108, 23);
         this.buttonSave.TabIndex = 4;
@@ -119,7 +121,7 @@
         // 
         this.checkDiff.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.checkDiff.AutoSize = true;
-        this.checkDiff.Location = new System.Drawing.Point(501, 442);
+        this.checkDiff.Location = new System.Drawing.Point(700, 445);
         this.checkDiff.Name = "checkDiff";
         this.checkDiff.Size = new System.Drawing.Size(76, 17);
         this.checkDiff.TabIndex = 3;
@@ -127,11 +129,30 @@
         this.checkDiff.UseVisualStyleBackColor = true;
         this.checkDiff.CheckedChanged += new System.EventHandler(this.checkDiff_CheckedChanged);
         // 
+        // label1
+        // 
+        this.label1.AutoSize = true;
+        this.label1.Location = new System.Drawing.Point(534, 445);
+        this.label1.Name = "label1";
+        this.label1.Size = new System.Drawing.Size(78, 13);
+        this.label1.TabIndex = 10;
+        this.label1.Text = "Dominant color";
+        // 
+        // dominantColorLabel
+        // 
+        this.dominantColorLabel.AutoSize = true;
+        this.dominantColorLabel.Location = new System.Drawing.Point(619, 444);
+        this.dominantColorLabel.Name = "dominantColorLabel";
+        this.dominantColorLabel.Size = new System.Drawing.Size(0, 13);
+        this.dominantColorLabel.TabIndex = 11;
+        // 
         // Form1
         // 
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(712, 474);
+        this.ClientSize = new System.Drawing.Size(909, 474);
+        this.Controls.Add(this.dominantColorLabel);
+        this.Controls.Add(this.label1);
         this.Controls.Add(this.checkDiff);
         this.Controls.Add(this.buttonLoad);
         this.Controls.Add(this.labelResult);
@@ -160,6 +181,8 @@
     private System.Windows.Forms.Label labelResult;
     private System.Windows.Forms.Button buttonLoad;
     private System.Windows.Forms.CheckBox checkDiff;
+    private System.Windows.Forms.Label label1;
+    private System.Windows.Forms.Label dominantColorLabel;
   }
 }
 

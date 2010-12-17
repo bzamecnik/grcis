@@ -184,6 +184,33 @@ namespace _011compressionbw
             // !!!}}
         }
 
+        /// <summary>
+        /// Computes dominant color in a given black & white image, that is
+        /// the color of the majority of pixels.
+        /// 
+        /// Assume that black = 0 and white = 1.
+        /// </summary>
+        /// <param name="image"></param>
+        /// <returns>0 if black is dominant, 1 if white is dominant</returns>
+        public int computeDominantColor(Bitmap image)
+        {
+            // the least half of pixels must be white for white to be the
+            // dominant color
+            int whiteThreshold = image.Width * image.Height / 2;
+            int totalIntensity = 0;
+            for (int y = 0; y < image.Height; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    totalIntensity += BWImageHelper.GetBWPixel(image, x, y);
+                    if (totalIntensity > whiteThreshold) {
+                        return 1;
+                    }
+                }
+            }
+            return 0;
+        }
+
         #endregion
 
     }
