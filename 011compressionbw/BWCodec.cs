@@ -47,7 +47,9 @@ namespace _011compressionbw
 
             // !!!{{ TODO: add the encoding code here
 
-            DeflateStream ds = new BufferedDeflateStream(16384, outputStream, CompressionMode.Compress, true);
+            //DeflateStream ds = new BufferedDeflateStream(16384, outputStream, CompressionMode.Compress, true);
+            //Stream ds = new BufferedStream(outputStream);
+            Stream ds = new BufferedStream(outputStream);
 
             try
             {
@@ -185,8 +187,13 @@ namespace _011compressionbw
             {
                 if (ds != null)
                 {
-                    ds.Close();
+                    ds.Flush();
                 }
+
+                //if (ds != null)
+                //{
+                //    ds.Close();
+                //}
             }
 
             // !!!}}
@@ -203,7 +210,8 @@ namespace _011compressionbw
 
             // !!!{{ TODO: add the decoding code here
 
-            DeflateStream ds = new DeflateStream(inps, CompressionMode.Decompress, true);
+            //DeflateStream ds = new DeflateStream(inps, CompressionMode.Decompress, true);
+            Stream ds = inps;
             Bitmap decodedImage = null;
 
             try
@@ -285,8 +293,8 @@ namespace _011compressionbw
 
                     //draw the pixel
                     //Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
-                    //BWImageHelper.SetBWPixel(decodedImage, startX, startY, lineColor);
-                    decodedImage.SetPixel(startX, startY, Color.Red);
+                    BWImageHelper.SetBWPixel(decodedImage, startX, startY, lineColor);
+                    //decodedImage.SetPixel(startX, startY, Color.Red);
 
                     //read the count of following directions
                     int directionsCount = ds.ReadByte();
@@ -317,43 +325,18 @@ namespace _011compressionbw
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
                         //Console.WriteLine("  Direction: {0} ({1})", direction, ordinal);
-                        //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
-                        decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
+                        //decodedImage.SetPixel(nextX, nextY, Color.Green);
                         directionsRead++;
                     }
                 }
-
-                //int bufLen = 0;
-                //for (int y = 0; y < height; y++)
-                //{
-                //    for (int x = 0; x < width; x++)
-                //    {
-                //        if (bufLen == 0)
-                //        {
-                //            buffer = ds.ReadByte();
-                //            if (buffer < 0) return null;
-                //            bufLen = 8;
-                //        }
-                //        // get the leftmost bit from the byte - the predictor error value
-                //        int readValue = (buffer & 0x80) >> 7;
-                //        //int predictedIntensity = Predictor.Predict(decodedImage, x, y);
-                //        //int errorValue = readValue;
-                //        //int decodedBWIntensity = predictedIntensity ^ readValue;
-                //        int decodedBWIntensity = readValue;
-                //        BWImageHelper.SetBWPixel(decodedImage, x, y, decodedBWIntensity);
-                //        // shift the buffer to the right by 1 bit
-                //        buffer += buffer;
-                //        bufLen--;
-                //    }
-                //    bufLen = 0;
-                //}
             }
             finally
             {
-                if (ds != null)
-                {
-                    ds.Close();
-                }
+                //if (ds != null)
+                //{
+                //    ds.Close();
+                //}
             }
             return decodedImage;
 
