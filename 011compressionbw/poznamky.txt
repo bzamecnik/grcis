@@ -8,7 +8,7 @@ Základní algoritmus:
 	- zapsat tuto informaci do výstupu
 - popsat jednotlivé èáry
 	- BÚNO èáry jsou èerné
-	- procházek postupnì pixely
+	- procházet postupnì pixely
 		- napø. pøedpokládejme, že v bìžném skenovacím poøadí:
 			- pro všechny øádky shora dolù
 				- pro všechny sloupce zleva doprava
@@ -25,4 +25,17 @@ Další úpravy:
 - okolí nezkoumat ve stejném poøadí, ale toto poøadí predikovat
 	- napø. podle poslední volby smìru
 		- to by se mohlo hodit na delší èáry, které vedou jedním smìrem
-  
+
+- použít 8-okolí
+
+==== reprezentace ====
+
+- pro každou cestu zadat:
+	- souøadnice poèátku
+		- dva integery - staèilo by dvoubytové shorty
+	- délka cesty
+		- šlo by omezit délku cesty na 256, aby se vešla do jednoho bytu
+			- poèet cest se dramaticky nezvýší, ale pro každou cestu pak staèí jen jeden byte
+	- smìry pro další pixely po cestì
+		- pro ètyøi smìry staèí 2 bity / smìr
+		- pro osm smìrù staèí 3 bity / smìr
