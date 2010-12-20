@@ -486,8 +486,11 @@ namespace _011compressionbw
         public EightPixelNeighborhood()
         {
             Directions = new List<Point>() {
-                RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
-                LEFT, LEFT_UP, UP, RIGHT_UP
+                RIGHT, LEFT, UP, DOWN,
+                RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP
+                // default clockwise order:
+                //RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
+                //LEFT, LEFT_UP, UP, RIGHT_UP
             };
         }
     }
