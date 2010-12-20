@@ -26,7 +26,10 @@ Další úpravy:
 	- napø. podle poslední volby smìru
 		- to by se mohlo hodit na delší èáry, které vedou jedním smìrem
 
-- použít 8-okolí
+*- použít 8-okolí
+
+- místo pozice prvního pixelu èáry uložit jen diferenci vùèi pøedchozí pozici
+
 
 ==== reprezentace ====
 
