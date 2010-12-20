@@ -49,6 +49,8 @@ namespace _011compressionbw
 
             DeflateStream ds = new BufferedDeflateStream(16384, outputStream, CompressionMode.Compress, true);
 
+            PredictionNeighborhood predictionNeighborhood = new PredictionNeighborhood(neighborhood);
+
             try
             {
                 // file header: [ MAGIC, width, height, dominant color ]
@@ -77,7 +79,7 @@ namespace _011compressionbw
 
                 int longestLine = 0;
 
-                List<Direction> lineDirections = new List<Direction>();
+                List<int> lineDirections = new List<int>();
 
                 Console.WriteLine("Encoding.");
 
@@ -107,15 +109,16 @@ namespace _011compressionbw
                         int currentY = y;
                         bool lineContinues = true;
                         int lineLength = 1;
-                        while (lineContinues && (lineLength < 256))
+                        int maxLineDirections = 1 << 16;
+                        while (lineContinues && (lineLength < maxLineDirections))
                         //while (lineContinues)
                         {
                             lineContinues = false;
                             int directionNumber = 0;
-                            foreach (Direction direction in neighborhood.Values)
+                            foreach (Point direction in predictionNeighborhood.Directions)
                             {
-                                int nextX = currentX + direction.Offset.X;
-                                int nextY = currentY + direction.Offset.Y;
+                                int nextX = currentX + direction.X;
+                                int nextY = currentY + direction.Y;
                                 if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
                                 {
                                     break;
@@ -127,10 +130,11 @@ namespace _011compressionbw
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
                                     //Console.WriteLine("  Direction: {0} ({1})", direction.Offset, directionNumber);
-                                    lineDirections.Add(direction);
+                                    lineDirections.Add(directionNumber);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
+                                    predictionNeighborhood.SetLastDirection(direction);
                                     BWImageHelper.SetBWPixel(copyImage, nextX, nextY, dominantColor);
                                     break;
                                 }
@@ -139,15 +143,16 @@ namespace _011compressionbw
                         }
 
                         // write the number of following directions
-                        ds.WriteByte((byte)((lineLength - 1) & 0xff));
+                        int lineDirectionsCount = lineLength - 1;
+                        ds.WriteByte((byte)((lineDirectionsCount >> 8) & 0xff));
+                        ds.WriteByte((byte)(lineDirectionsCount & 0xff));
 
                         // write the list of following directions
                         int buffer = 0;
                         int bufferLength = 0;
-                        foreach (Direction direction in lineDirections)
+                        foreach (int direction in lineDirections)
                         {
-                            int ordinal = direction.Ordinal;
-                            buffer = (buffer << neighborhood.SignificantBits) + ordinal;
+                            buffer = (buffer << neighborhood.SignificantBits) + direction;
                             bufferLength += neighborhood.SignificantBits;
                             int remainingBits = bufferLength - 8; // free space in the byte
                             if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
@@ -202,6 +207,8 @@ namespace _011compressionbw
             if (inps == null) return null;
 
             // !!!{{ TODO: add the decoding code here
+
+            PredictionNeighborhood predictionNeighborhood = new PredictionNeighborhood(neighborhood);
 
             DeflateStream ds = new DeflateStream(inps, CompressionMode.Decompress, true);
             Bitmap decodedImage = null;
@@ -291,6 +298,10 @@ namespace _011compressionbw
                     //read the count of following directions
                     int directionsCount = ds.ReadByte();
                     if (directionsCount < 0) return null;
+                    buffer = ds.ReadByte();
+                    if (buffer < 0) return null;
+                    directionsCount = (directionsCount << 8) + buffer;
+
                     int directionsRead = 0;
                     int bufferLength = 0;
                     int nextX = startX;
@@ -308,10 +319,11 @@ namespace _011compressionbw
 
                         //read the direction ordinal
                         int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int ordinal = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
                         bufferLength -= neighborhood.SignificantBits;
                         //convert the directions ordinal to a Point
-                        Point direction = neighborhood.DirectionFromOrdinal(ordinal).Offset;
+                        Point direction = predictionNeighborhood.Directions[directionIndex];
+                        predictionNeighborhood.SetLastDirection(direction);
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
@@ -443,6 +455,33 @@ namespace _011compressionbw
         public abstract int SignificantBits { get; }
 
         public abstract Direction DirectionFromOrdinal(int ordinal);
+    }
+
+    class PredictionNeighborhood {
+        public List<Point> Directions { get; private set; }
+
+        public PredictionNeighborhood(Neighborhood neighborhood) {
+            Directions = new List<Point>();
+            // initialize the list of directions with the default order
+            foreach (Direction direction in neighborhood.Values)
+            {
+                Directions.Add(direction.Offset);
+            }
+        }
+
+        public Point GetLastDirection()
+        {
+            return Directions[0];
+        }
+
+        public void SetLastDirection(Point direction)
+        {
+            // move the given direction to the beginning of the list
+            // assume the given direction is in the list
+            int index = Directions.IndexOf(direction);
+            Directions.RemoveAt(index);
+            Directions.Insert(0, direction);
+        }
     }
 
     class Direction
