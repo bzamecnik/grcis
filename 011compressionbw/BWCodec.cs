@@ -125,7 +125,7 @@ namespace _011compressionbw
                                 int nextY = currentY + direction.Y;
                                 if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
                                 {
-                                    break;
+                                    continue;
                                 }
                                 int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
                                 if (!IsBackground(dominantColor, nextIntensity))
@@ -455,7 +455,7 @@ namespace _011compressionbw
         public List<Point> Directions { get; protected set; }
         public int SignificantBits {
             get {
-                return 1 << (int)Math.Ceiling(Math.Log(Directions.Count, 2.0));
+                return (int)Math.Ceiling(Math.Log(Directions.Count, 2.0));
             }
         }
     }
