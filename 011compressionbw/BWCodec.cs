@@ -75,6 +75,8 @@ namespace _011compressionbw
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
 
+                Point previousStartingPoint = new Point();
+
                 int longestLine = 0;
 
                 List<Direction> lineDirections = new List<Direction>();
@@ -96,15 +98,19 @@ namespace _011compressionbw
                         BWImageHelper.SetBWPixel(copyImage, x, y, dominantColor);
                         // write position of line's starting pixel
                         // X and Y as two-byte numbers
-                        ds.WriteByte((byte)((x >> 8) & 0xff));
-                        ds.WriteByte((byte)(x & 0xff));
-                        ds.WriteByte((byte)((y >> 8) & 0xff));
-                        ds.WriteByte((byte)(y & 0xff));
+                        int diffX = x - previousStartingPoint.X;
+                        int diffY = y - previousStartingPoint.Y;
+                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffX & 0xff));
+                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffY & 0xff));
 
                         firstLinePixels++;
 
                         int currentX = x;
                         int currentY = y;
+                        previousStartingPoint.X = x;
+                        previousStartingPoint.Y = y;
                         bool lineContinues = true;
                         int lineLength = 1;
                         while (lineContinues && (lineLength < 256))
@@ -263,11 +269,13 @@ namespace _011compressionbw
                     directionBitMask += 1 << i;
                 }
 
+                Point previousStartingPoint = new Point();
+
                 bool canProcessLines = true;
                 while (canProcessLines) {
                     //read starting pixel position - X, Y
-                    int startX = ds.ReadByte();
-                    if (startX < 0)
+                    int diffX = ds.ReadByte();
+                    if (diffX < 0)
                     {
                         canProcessLines = false;
                         break;
@@ -275,18 +283,23 @@ namespace _011compressionbw
 
                     buffer = ds.ReadByte();
                     if (buffer < 0) return null;
-                    startX = (startX << 8) + buffer;
+                    diffX = (diffX << 8) + buffer;
 
-                    int startY = ds.ReadByte();
-                    if (startY < 0) return null;
+                    int diffY = ds.ReadByte();
+                    if (diffY < 0) return null;
                     buffer = ds.ReadByte();
                     if (buffer < 0) return null;
-                    startY = (startY << 8) + buffer;
+                    diffY = (diffY << 8) + buffer;
+
+                    int startX = previousStartingPoint.X + (short) diffX;
+                    int startY = previousStartingPoint.Y + (short) diffY;
 
                     //draw the pixel
                     //Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
                     //BWImageHelper.SetBWPixel(decodedImage, startX, startY, lineColor);
                     decodedImage.SetPixel(startX, startY, Color.Red);
+                    previousStartingPoint.X = startX;
+                    previousStartingPoint.Y = startY;
 
                     //read the count of following directions
                     int directionsCount = ds.ReadByte();
