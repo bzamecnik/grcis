@@ -16,7 +16,8 @@ namespace _011compressionbw
         protected const uint MAGIC = 0xff12fe45;
 
         protected Predictor Predictor = new PreviousLeftPixelPredictor();
-        Neighborhood neighborhood = new EightPixelNeighborhood();
+        Neighborhood neighborhood = new SixteenPixelNeighborhood();
+        //Neighborhood neighborhood = new EightPixelNeighborhood();
         //Neighborhood neighborhood = new FourNextPixelsNeighborhood();
 
         #endregion
@@ -335,31 +336,6 @@ namespace _011compressionbw
                         directionsRead++;
                     }
                 }
-
-                //int bufLen = 0;
-                //for (int y = 0; y < height; y++)
-                //{
-                //    for (int x = 0; x < width; x++)
-                //    {
-                //        if (bufLen == 0)
-                //        {
-                //            buffer = ds.ReadByte();
-                //            if (buffer < 0) return null;
-                //            bufLen = 8;
-                //        }
-                //        // get the leftmost bit from the byte - the predictor error value
-                //        int readValue = (buffer & 0x80) >> 7;
-                //        //int predictedIntensity = Predictor.Predict(decodedImage, x, y);
-                //        //int errorValue = readValue;
-                //        //int decodedBWIntensity = predictedIntensity ^ readValue;
-                //        int decodedBWIntensity = readValue;
-                //        BWImageHelper.SetBWPixel(decodedImage, x, y, decodedBWIntensity);
-                //        // shift the buffer to the right by 1 bit
-                //        buffer += buffer;
-                //        bufLen--;
-                //    }
-                //    bufLen = 0;
-                //}
             }
             finally
             {
@@ -488,10 +464,37 @@ namespace _011compressionbw
             Directions = new List<Point>() {
                 RIGHT, LEFT, UP, DOWN,
                 RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP
+
                 // default clockwise order:
                 //RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
                 //LEFT, LEFT_UP, UP, RIGHT_UP
             };
+        }
+    }
+
+    class SixteenPixelNeighborhood : EightPixelNeighborhood
+    {
+        public SixteenPixelNeighborhood()
+            : base()
+        {
+            Directions.AddRange(new List<Point>() {
+                new Point(2, 0), new Point(2, 2), new Point(0, 2), new Point(-2, 2),
+                new Point(-2, 0), new Point(-2, -2), new Point(0, -2), new Point(2, -2),
+            });
+        }
+    }
+
+    class ThirtyTwoPixelNeighborhood : SixteenPixelNeighborhood
+    {
+        public ThirtyTwoPixelNeighborhood()
+            : base()
+        {
+            Directions.AddRange(new List<Point>() {
+                new Point(2, 1), new Point(1, 2), new Point(-1, 2), new Point(-2, 1),
+                new Point(-2, -1), new Point(-1, -2), new Point(1, -2), new Point(2, -1),
+                new Point(3, 0), new Point(3, 3), new Point(0, 3), new Point(-3, 3),
+                new Point(-3, 0), new Point(-3, -3), new Point(0, -3), new Point(3, -3),
+            });
         }
     }
 
