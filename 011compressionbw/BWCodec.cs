@@ -79,7 +79,7 @@ namespace _011compressionbw
 
                 int longestLine = 0;
 
-                List<Direction> lineDirections = new List<Direction>();
+                List<int> lineDirections = new List<int>();
 
                 Console.WriteLine("Encoding.");
 
@@ -118,10 +118,11 @@ namespace _011compressionbw
                         {
                             lineContinues = false;
                             int directionNumber = 0;
-                            foreach (Direction direction in neighborhood.Values)
+                            for (int directionIndex = 0; directionIndex < neighborhood.Directions.Count; directionIndex++)
                             {
-                                int nextX = currentX + direction.Offset.X;
-                                int nextY = currentY + direction.Offset.Y;
+                                Point direction = neighborhood.Directions[directionIndex];
+                                int nextX = currentX + direction.X;
+                                int nextY = currentY + direction.Y;
                                 if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
                                 {
                                     break;
@@ -132,8 +133,8 @@ namespace _011compressionbw
                                     currentX = nextX;
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", direction.Offset, directionNumber);
-                                    lineDirections.Add(direction);
+                                    //Console.WriteLine("  Direction: {0} ({1})", directionIndex.Offset, directionNumber);
+                                    lineDirections.Add(directionIndex);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
@@ -150,10 +151,9 @@ namespace _011compressionbw
                         // write the list of following directions
                         int buffer = 0;
                         int bufferLength = 0;
-                        foreach (Direction direction in lineDirections)
+                        foreach (int directionIndex in lineDirections)
                         {
-                            int ordinal = direction.Ordinal;
-                            buffer = (buffer << neighborhood.SignificantBits) + ordinal;
+                            buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
                             bufferLength += neighborhood.SignificantBits;
                             int remainingBits = bufferLength - 8; // free space in the byte
                             if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
@@ -262,7 +262,7 @@ namespace _011compressionbw
 
                 Console.WriteLine("Decoding.");
 
-                // compute bit mask for getting direction bits
+                // compute bit mask for getting directionIndex bits
                 int directionBitMask = 0;
                 for (int i = 0; i < neighborhood.SignificantBits; i++)
                 {
@@ -319,17 +319,17 @@ namespace _011compressionbw
                             bufferLength += 8;
                         }
 
-                        //read the direction ordinal
+                        //read the directionIndex directionIndex
                         int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int ordinal = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
                         bufferLength -= neighborhood.SignificantBits;
-                        //convert the directions ordinal to a Point
-                        Point direction = neighborhood.DirectionFromOrdinal(ordinal).Offset;
+                        //convert the directions directionIndex to a Point
+                        Point direction = neighborhood.Directions[directionIndex];
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", direction, ordinal);
+                        //Console.WriteLine("  Direction: {0} ({1})", directionIndex, directionIndex);
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
                         decodedImage.SetPixel(nextX, nextY, Color.Green);
                         directionsRead++;
@@ -452,99 +452,43 @@ namespace _011compressionbw
 
     abstract class Neighborhood
     {
-        public abstract IEnumerable<Direction> Values { get; }
-        public abstract int SignificantBits { get; }
-
-        public abstract Direction DirectionFromOrdinal(int ordinal);
-    }
-
-    class Direction
-    {
-        public Point Offset { get; set; }
-        public int Ordinal { get; set; }
-
-        public Direction(int ordinal, Point offset)
-        {
-            Offset = offset;
-            Ordinal = ordinal;
+        public List<Point> Directions { get; protected set; }
+        public int SignificantBits {
+            get {
+                return 1 << (int)Math.Ceiling(Math.Log(Directions.Count, 2.0));
+            }
         }
     }
 
     class FourNextPixelsNeighborhood : Neighborhood
     {
-        public override int SignificantBits { get { return 2; } }
+        public static readonly Point RIGHT = new Point(1, 0);
+        public static readonly Point RIGHT_DOWN = new Point(1, 1);
+        public static readonly Point DOWN = new Point(0, 1);
+        public static readonly Point LEFT_DOWN = new Point(-1, 1);
 
-        public static readonly Direction RIGHT = new Direction(0, new Point(1, 0));
-        public static readonly Direction RIGHT_DOWN = new Direction(1, new Point(1, 1));
-        public static readonly Direction DOWN = new Direction(2, new Point(0, 1));
-        public static readonly Direction LEFT_DOWN = new Direction(3, new Point(-1, 1));
-
-        public override IEnumerable<Direction> Values
-        {
-            get
-            {
-                yield return RIGHT;
-                yield return RIGHT_DOWN;
-                yield return DOWN;
-                yield return LEFT_DOWN;
-            }
-        }
-
-        public override Direction DirectionFromOrdinal(int ordinal)
-        {
-            switch (ordinal)
-            {
-                case 0: return RIGHT;
-                case 1: return RIGHT_DOWN;
-                case 2: return DOWN;
-                case 3: return LEFT_DOWN;
-                default: throw new ArgumentException();
-            }
+        public FourNextPixelsNeighborhood() {
+            Directions = new List<Point>() { RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN };
         }
     }
 
     class EightPixelNeighborhood : Neighborhood
     {
-        public override int SignificantBits { get { return 3; } }
+        public static readonly Point RIGHT = new Point(1, 0);
+        public static readonly Point RIGHT_DOWN = new Point(1, 1);
+        public static readonly Point DOWN = new Point(0, 1);
+        public static readonly Point LEFT_DOWN = new Point(-1, 1);
+        public static readonly Point LEFT = new Point(-1, 0);
+        public static readonly Point LEFT_UP = new Point(-1, -1);
+        public static readonly Point UP = new Point(0, -1);
+        public static readonly Point RIGHT_UP = new Point(1, -1);
 
-        public static readonly Direction RIGHT = new Direction(0, new Point(1, 0));
-        public static readonly Direction RIGHT_DOWN = new Direction(1, new Point(1, 1));
-        public static readonly Direction DOWN = new Direction(2, new Point(0, 1));
-        public static readonly Direction LEFT_DOWN = new Direction(3, new Point(-1, 1));
-        public static readonly Direction LEFT = new Direction(4, new Point(-1, 0));
-        public static readonly Direction LEFT_UP = new Direction(5, new Point(-1, -1));
-        public static readonly Direction UP = new Direction(6, new Point(0, -1));
-        public static readonly Direction RIGHT_UP = new Direction(7, new Point(1, -1));
-
-        public override IEnumerable<Direction> Values
+        public EightPixelNeighborhood()
         {
-            get
-            {
-                yield return RIGHT;
-                yield return RIGHT_DOWN;
-                yield return DOWN;
-                yield return LEFT_DOWN;
-                yield return LEFT;
-                yield return LEFT_UP;
-                yield return UP;
-                yield return RIGHT_UP;
-            }
-        }
-
-        public override Direction DirectionFromOrdinal(int ordinal)
-        {
-            switch (ordinal)
-            {
-                case 0: return RIGHT;
-                case 1: return RIGHT_DOWN;
-                case 2: return DOWN;
-                case 3: return LEFT_DOWN;
-                case 4: return LEFT;
-                case 5: return LEFT_UP;
-                case 6: return UP;
-                case 7: return RIGHT_UP;
-                default: throw new ArgumentException();
-            }
+            Directions = new List<Point>() {
+                RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
+                LEFT, LEFT_UP, UP, RIGHT_UP
+            };
         }
     }
 

@@ -28,7 +28,7 @@ Další úpravy:
 
 *- použít 8-okolí
 
-- místo pozice prvního pixelu èáry uložit jen diferenci vùèi pøedchozí pozici
+*- místo pozice prvního pixelu èáry uložit jen diferenci vùèi pøedchozí pozici
 
 
 ==== reprezentace ====
@@ -39,6 +39,7 @@ Další úpravy:
 	- délka cesty
 		- šlo by omezit délku cesty na 256, aby se vešla do jednoho bytu
 			- poèet cest se dramaticky nezvýší, ale pro každou cestu pak staèí jen jeden byte
+			- vypadá to, že se to chová lépe, než dva byty pro cesty do délky 65536
 	- smìry pro další pixely po cestì
 		- pro ètyøi smìry staèí 2 bity / smìr
 		- pro osm smìrù staèí 3 bity / smìr
