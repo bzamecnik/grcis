@@ -101,10 +101,6 @@ namespace _011compressionbw
                         // X and Y as two-byte numbers
                         int diffX = x - previousStartingPoint.X;
                         int diffY = y - previousStartingPoint.Y;
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffY & 0xff));
 
                         firstLinePixels++;
 
@@ -118,7 +114,6 @@ namespace _011compressionbw
                         //while (lineContinues)
                         {
                             lineContinues = false;
-                            int directionNumber = 0;
                             for (int directionIndex = 0; directionIndex < neighborhood.Directions.Count; directionIndex++)
                             {
                                 Point direction = neighborhood.Directions[directionIndex];
@@ -134,7 +129,7 @@ namespace _011compressionbw
                                     currentX = nextX;
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", directionIndex.Offset, directionNumber);
+                                    //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                                     lineDirections.Add(directionIndex);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
@@ -142,9 +137,13 @@ namespace _011compressionbw
                                     BWImageHelper.SetBWPixel(copyImage, nextX, nextY, dominantColor);
                                     break;
                                 }
-                                directionNumber++;
                             }
                         }
+
+                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffX & 0xff));
+                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffY & 0xff));
 
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
@@ -330,7 +329,7 @@ namespace _011compressionbw
                         nextX += direction.X;
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", directionIndex, directionIndex);
+                        //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
                         decodedImage.SetPixel(nextX, nextY, Color.Green);
                         directionsRead++;
@@ -429,9 +428,23 @@ namespace _011compressionbw
     abstract class Neighborhood
     {
         public List<Point> Directions { get; protected set; }
-        public int SignificantBits {
-            get {
-                return (int)Math.Ceiling(Math.Log(Directions.Count, 2.0));
+        public int SignificantBits
+        {
+            get
+            {
+                return ComputeSignificantBits(Directions.Count);
+            }
+        }
+
+        public static int ComputeSignificantBits(int number)
+        {
+            if (number > 0)
+            {
+                return (int)Math.Ceiling(Math.Log(number, 2.0));
+            }
+            else
+            {
+                return 0;
             }
         }
     }
