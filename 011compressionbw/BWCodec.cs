@@ -358,11 +358,7 @@ namespace _011compressionbw
                     }                    
 
                     // compute bit mask for getting directionIndex bits
-                    int directionBitMask = 0;
-                    for (int i = 0; i < directionBits; i++)
-                    {
-                        directionBitMask += 1 << i;
-                    }
+                    int directionBitMask = -(-1 << directionBits) - 1;
 
                     int bufferLength = 0;
                     int nextX = startX;
