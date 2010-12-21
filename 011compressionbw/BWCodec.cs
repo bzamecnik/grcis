@@ -142,19 +142,29 @@ namespace _011compressionbw
                             }
                         }
 
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffY & 0xff));
+                        // in the following 4 bytes store:
+                        // - two diff coordinates as 13-bit numbers
+                        //   - => max. image dimensions: 8192x8192 px
+                        // - number of direction bits as a 6-bit number
+                        //   - => max. number of directions: 64
+
+                        // the maximum number of bits needed for representing directions in the following line
+                        //int directionBits = neighborhood.SignificantBits;
+                        int directionBits = Neighborhood.ComputeSignificantBits(maxDirectionIndex + 1);
+
+                        ds.WriteByte((byte)((diffX >> 5) & 0xff));
+                        //Console.Write("{0} ", (diffX >> 5) & 0xff);
+                        ds.WriteByte((byte)(((diffX << 3) | ((diffY >> 10) & 0x07)) & 0xff));
+                        //Console.Write("{0} ", ((diffX << 3) | ((diffY >> 10) & 0x07)) & 0xff);
+                        ds.WriteByte((byte)((diffY >> 2) & 0xff));
+                        //Console.Write("{0} ", (diffY >> 2) & 0xff);
+                        ds.WriteByte((byte)(((diffY << 6) | (directionBits & 0x1f)) & 0xff));
+                        //Console.Write("{0} ", ((diffY << 6) | (directionBits & 0x1f)) & 0xff);
+                        //Console.WriteLine("diff: [{0}, {1}], directionBits: {2}", diffX, diffY, directionBits);
 
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
-                        // write the maximum number of bits needed for representing
-                        // directions in the following line
-                        //int directionBits = neighborhood.SignificantBits;
-                        int directionBits = Neighborhood.ComputeSignificantBits(maxDirectionIndex + 1);
-                        ds.WriteByte((byte)(directionBits & 0xff));
-
+                        
                         // write the list of following directions
                         if (directionBits > 0)
                         {
@@ -307,30 +317,49 @@ namespace _011compressionbw
                 {
                     //read starting pixel position - X, Y
                     int diffX = ds.ReadByte();
+                    //Console.Write("{0} ", diffX);
                     if (diffX < 0)
                     {
                         canProcessLines = false;
                         break;
                     }
-
                     buffer = ds.ReadByte();
                     if (buffer < 0)
                     {
                         return null;
                     }
-                    diffX = (diffX << 8) + buffer;
+                    //Console.Write("{0} ", buffer);
+                    diffX = (diffX << 5) | ((buffer & 0xff) >> 3);
+                    // convert negative 13-bit numbers to negative integers
+                    diffX = (short) (diffX | ((diffX & (1 << 12)) >> 12) * 0xe000);
 
-                    int diffY = ds.ReadByte();
-                    if (diffY < 0)
-                    {
-                        return null;
-                    }
+                    int diffY = buffer & 0x07;
                     buffer = ds.ReadByte();
                     if (buffer < 0)
                     {
                         return null;
                     }
-                    diffY = (diffY << 8) + buffer;
+                    //Console.Write("{0} ", buffer);
+                    diffY = (diffY << 8) | (buffer & 0xff);
+                    buffer = ds.ReadByte();
+                    if (buffer < 0)
+                    {
+                        return null;
+                    }
+                    //Console.Write("{0} ", buffer);
+                    diffY = (diffY << 2) + ((buffer & 0xff) >> 6);
+                    diffY = (short)(diffY | ((diffY & (1 << 12)) >> 12) * 0xe000);
+
+                    //int directionBits = neighborhood.SignificantBits;
+                    int directionBits = buffer & 0x3f;
+                    if (directionBits < 0)
+                    {
+                        return null;
+                    }
+
+                    // compute bit mask for getting directionIndex bits
+                    int directionBitMask = -(-1 << directionBits) - 1;
+                    //Console.WriteLine("diff: [{0}, {1}], directionBits: {2}", diffX, diffY, directionBits);
 
                     int startX = previousStartingPoint.X + (short)diffX;
                     int startY = previousStartingPoint.Y + (short)diffY;
@@ -349,16 +378,6 @@ namespace _011compressionbw
                         return null;
                     }
                     int directionsRead = 0;
-
-                    //int directionBits = neighborhood.SignificantBits;
-                    int directionBits = ds.ReadByte();
-                    if (directionBits < 0)
-                    {
-                        return null;
-                    }                    
-
-                    // compute bit mask for getting directionIndex bits
-                    int directionBitMask = -(-1 << directionBits) - 1;
 
                     int bufferLength = 0;
                     int nextX = startX;
