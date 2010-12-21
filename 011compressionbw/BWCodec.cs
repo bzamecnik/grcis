@@ -101,10 +101,6 @@ namespace _011compressionbw
                         // X and Y as two-byte numbers
                         int diffX = x - previousStartingPoint.X;
                         int diffY = y - previousStartingPoint.Y;
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffY & 0xff));
 
                         firstLinePixels++;
 
@@ -114,11 +110,11 @@ namespace _011compressionbw
                         previousStartingPoint.Y = y;
                         bool lineContinues = true;
                         int lineLength = 1;
+                        int maxDirectionIndex = 0;
                         while (lineContinues && (lineLength < 256))
                         //while (lineContinues)
                         {
                             lineContinues = false;
-                            int directionNumber = 0;
                             for (int directionIndex = 0; directionIndex < neighborhood.Directions.Count; directionIndex++)
                             {
                                 Point direction = neighborhood.Directions[directionIndex];
@@ -134,47 +130,59 @@ namespace _011compressionbw
                                     currentX = nextX;
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", directionIndex.Offset, directionNumber);
+                                    //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                                     lineDirections.Add(directionIndex);
+                                    maxDirectionIndex = Math.Max(maxDirectionIndex, directionIndex);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
                                     BWImageHelper.SetBWPixel(copyImage, nextX, nextY, dominantColor);
                                     break;
                                 }
-                                directionNumber++;
                             }
                         }
+
+                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffX & 0xff));
+                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
+                        ds.WriteByte((byte)(diffY & 0xff));
 
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
+                        // write the maximum number of bits needed for representing
+                        // directions in the following line
+                        //int directionBits = neighborhood.SignificantBits;
+                        int directionBits = Neighborhood.ComputeSignificantBits(maxDirectionIndex + 1);
+                        ds.WriteByte((byte)(directionBits & 0xff));
 
                         // write the list of following directions
-                        int buffer = 0;
-                        int bufferLength = 0;
-                        foreach (int directionIndex in lineDirections)
+                        if (directionBits > 0)
                         {
-                            buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
-                            bufferLength += neighborhood.SignificantBits;
-                            int remainingBits = bufferLength - 8; // free space in the byte
-                            if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
+                            int buffer = 0;
+                            int bufferLength = 0;
+                            foreach (int directionIndex in lineDirections)
                             {
-                                int writtenByte = (buffer >> remainingBits) & 0xff;
-                                ds.WriteByte((byte)(writtenByte & 0xff));
-                                buffer -= writtenByte << remainingBits;
-                                bufferLength -= 8;
+                                buffer = (buffer << directionBits) + directionIndex;
+                                bufferLength += directionBits;
+                                int remainingBits = bufferLength - 8; // free space in the byte
+                                if ((bufferLength >= 8) && (remainingBits < directionBits))
+                                {
+                                    int writtenByte = (buffer >> remainingBits) & 0xff;
+                                    ds.WriteByte((byte)(writtenByte & 0xff));
+                                    buffer -= writtenByte << remainingBits;
+                                    bufferLength -= 8;
+                                }
+                            }
+                            if (bufferLength > 0)
+                            {
+                                // shift the remaining bits completely to the left
+                                // (so that the rest of the byte is filled with zeros only)
+                                buffer <<= 8 - bufferLength;
+                                ds.WriteByte((byte)(buffer & 0xff));
+                                buffer = 0;
+                                bufferLength = 0;
                             }
                         }
-                        if (bufferLength > 0)
-                        {
-                            // shift the remaining bits completely to the left
-                            // (so that the rest of the byte is filled with zeros only)
-                            buffer <<= 8 - bufferLength;
-                            ds.WriteByte((byte)(buffer & 0xff));
-                            buffer = 0;
-                            bufferLength = 0;
-                        }
-
                         lineDirections.Clear();
 
                         longestLine = Math.Max(longestLine, lineLength);
@@ -219,34 +227,63 @@ namespace _011compressionbw
 
                 // read magic number
                 buffer = ds.ReadByte();
-                if (buffer < 0 || buffer != ((MAGIC >> 24) & 0xff)) return null;
+                if (buffer < 0 || buffer != ((MAGIC >> 24) & 0xff))
+                {
+                    return null;
+                }
                 buffer = ds.ReadByte();
-                if (buffer < 0 || buffer != ((MAGIC >> 16) & 0xff)) return null;
+                if (buffer < 0 || buffer != ((MAGIC >> 16) & 0xff))
+                {
+                    return null;
+                }
                 buffer = ds.ReadByte();
-                if (buffer < 0 || buffer != ((MAGIC >> 8) & 0xff)) return null;
+                if (buffer < 0 || buffer != ((MAGIC >> 8) & 0xff))
+                {
+                    return null;
+                }
                 buffer = ds.ReadByte();
-                if (buffer < 0 || buffer != (MAGIC & 0xff)) return null;
+                if (buffer < 0 || buffer != (MAGIC & 0xff))
+                {
+                    return null;
+                }
 
                 // read image width
                 int width = ds.ReadByte();
-                if (width < 0) return null;
+                if (width < 0)
+                {
+                    return null;
+                }
                 buffer = ds.ReadByte();
-                if (buffer < 0) return null;
+                if (buffer < 0)
+                {
+                    return null;
+                }
                 width = (width << 8) + buffer;
 
                 // read image height
                 int height = ds.ReadByte();
-                if (height < 0) return null;
+                if (height < 0)
+                {
+                    return null;
+                }
                 buffer = ds.ReadByte();
-                if (buffer < 0) return null;
+                if (buffer < 0)
+                {
+                    return null;
+                }
                 height = (height << 8) + buffer;
 
                 if (width < 1 || height < 1)
+                {
                     return null;
+                }
 
                 // read dominant color
                 int dominantColor = ds.ReadByte();
-                if (dominantColor < 0) return null;
+                if (dominantColor < 0)
+                {
+                    return null;
+                }
                 int lineColor = 1 - dominantColor;
 
                 decodedImage = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
@@ -263,17 +300,11 @@ namespace _011compressionbw
 
                 Console.WriteLine("Decoding.");
 
-                // compute bit mask for getting directionIndex bits
-                int directionBitMask = 0;
-                for (int i = 0; i < neighborhood.SignificantBits; i++)
-                {
-                    directionBitMask += 1 << i;
-                }
-
                 Point previousStartingPoint = new Point();
 
                 bool canProcessLines = true;
-                while (canProcessLines) {
+                while (canProcessLines)
+                {
                     //read starting pixel position - X, Y
                     int diffX = ds.ReadByte();
                     if (diffX < 0)
@@ -283,17 +314,26 @@ namespace _011compressionbw
                     }
 
                     buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
+                    if (buffer < 0)
+                    {
+                        return null;
+                    }
                     diffX = (diffX << 8) + buffer;
 
                     int diffY = ds.ReadByte();
-                    if (diffY < 0) return null;
+                    if (diffY < 0)
+                    {
+                        return null;
+                    }
                     buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
+                    if (buffer < 0)
+                    {
+                        return null;
+                    }
                     diffY = (diffY << 8) + buffer;
 
-                    int startX = previousStartingPoint.X + (short) diffX;
-                    int startY = previousStartingPoint.Y + (short) diffY;
+                    int startX = previousStartingPoint.X + (short)diffX;
+                    int startY = previousStartingPoint.Y + (short)diffY;
 
                     //draw the pixel
                     //Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
@@ -304,33 +344,59 @@ namespace _011compressionbw
 
                     //read the count of following directions
                     int directionsCount = ds.ReadByte();
-                    if (directionsCount < 0) return null;
+                    if (directionsCount < 0)
+                    {
+                        return null;
+                    }
                     int directionsRead = 0;
+
+                    //int directionBits = neighborhood.SignificantBits;
+                    int directionBits = ds.ReadByte();
+                    if (directionBits < 0)
+                    {
+                        return null;
+                    }                    
+
+                    // compute bit mask for getting directionIndex bits
+                    int directionBitMask = 0;
+                    for (int i = 0; i < directionBits; i++)
+                    {
+                        directionBitMask += 1 << i;
+                    }
+
                     int bufferLength = 0;
                     int nextX = startX;
                     int nextY = startY;
+
                     while (directionsRead < directionsCount)
                     {
-                        if (bufferLength < neighborhood.SignificantBits)
+                        if (bufferLength < directionBits)
                         {
                             buffer &= 0xffff >> (16 - bufferLength);
                             buffer <<= 8;
                             buffer += ds.ReadByte();
-                            if (buffer < 0) return null;
+                            if (buffer < 0)
+                            {
+                                return null;
+                            }
                             bufferLength += 8;
                         }
 
-                        //read the directionIndex directionIndex
-                        int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
-                        bufferLength -= neighborhood.SignificantBits;
+                        //read the directionIndex
+                        int directionIndex = 0;
+                        //if (directionBits > 0)
+                        //{
+                            int maskOffset = bufferLength - directionBits;
+                            directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                            bufferLength -= directionBits;
+                        //}
                         //convert the directions directionIndex to a Point
                         Point direction = neighborhood.Directions[directionIndex];
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", directionIndex, directionIndex);
+                        //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
                         decodedImage.SetPixel(nextX, nextY, Color.Green);
                         directionsRead++;
@@ -431,7 +497,18 @@ namespace _011compressionbw
         public List<Point> Directions { get; protected set; }
         public int SignificantBits {
             get {
-                return (int)Math.Ceiling(Math.Log(Directions.Count, 2.0));
+                return ComputeSignificantBits(Directions.Count);
+            }
+        }
+
+        public static int ComputeSignificantBits(int number) {
+            if (number > 0)
+            {
+                return (int)Math.Ceiling(Math.Log(number, 2.0));
+            }
+            else
+            {
+                return 0;
             }
         }
     }
