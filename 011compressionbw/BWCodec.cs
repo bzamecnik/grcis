@@ -111,6 +111,10 @@ namespace _011compressionbw
                         bool lineContinues = true;
                         int lineLength = 1;
                         int maxDirectionIndex = 0;
+                        // the maximum number of bits needed for representing directions in the following line
+                        //int directionBits = neighborhood.SignificantBits;
+                        int directionBits = 0;
+
                         while (lineContinues && (lineLength < 256))
                         //while (lineContinues)
                         {
@@ -127,12 +131,28 @@ namespace _011compressionbw
                                 int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
                                 if (!IsBackground(dominantColor, nextIntensity))
                                 {
+                                    if (directionIndex > maxDirectionIndex)
+                                    {
+                                        int newDirectionBits = Neighborhood.ComputeSignificantBits(directionIndex + 1);
+                                        if (newDirectionBits > directionBits)
+                                        {
+                                            if (lineLength > 32)
+                                            {
+                                                // Increasing number of bits for directions would not pay off.
+                                                // It would be better to stop the line here.
+                                                // In directions will be saved more bits than is the size of
+                                                // the new starting pixel.
+                                                break;
+                                            }
+                                            directionBits = newDirectionBits;
+                                            maxDirectionIndex = directionIndex;
+                                        }
+                                    }
                                     currentX = nextX;
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
                                     //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                                     lineDirections.Add(directionIndex);
-                                    maxDirectionIndex = Math.Max(maxDirectionIndex, directionIndex);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
@@ -148,9 +168,6 @@ namespace _011compressionbw
                         // - number of direction bits as a 6-bit number
                         //   - => max. number of directions: 64
 
-                        // the maximum number of bits needed for representing directions in the following line
-                        //int directionBits = neighborhood.SignificantBits;
-                        int directionBits = Neighborhood.ComputeSignificantBits(maxDirectionIndex + 1);
 
                         ds.WriteByte((byte)((diffX >> 5) & 0xff));
                         //Console.Write("{0} ", (diffX >> 5) & 0xff);
