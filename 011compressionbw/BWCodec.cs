@@ -330,7 +330,9 @@ namespace _011compressionbw
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
                         //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
-                        decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        //decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        int linePointIntensity = (int)(127.0 * (1.0 - directionsRead / (double)directionsCount));
+                        decodedImage.SetPixel(nextX, nextY, Color.FromArgb(0, linePointIntensity, linePointIntensity));
                         directionsRead++;
                     }
                 }
