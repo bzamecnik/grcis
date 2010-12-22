@@ -15,10 +15,7 @@ namespace _011compressionbw
 
         protected const uint MAGIC = 0xff12fe45;
 
-        protected Predictor Predictor = new PreviousLeftPixelPredictor();
-        Neighborhood neighborhood = new SixteenPixelNeighborhood();
-        //Neighborhood neighborhood = new EightPixelNeighborhood();
-        //Neighborhood neighborhood = new FourNextPixelsNeighborhood();
+        Neighborhood neighborhood = new EightPixelNeighborhood();
 
         #endregion
 
@@ -82,7 +79,7 @@ namespace _011compressionbw
 
                 List<int> lineDirections = new List<int>();
 
-                Console.WriteLine("Encoding.");
+                //Console.WriteLine("Encoding.");
 
                 for (int y = 0; y < height; y++)
                 {
@@ -108,15 +105,18 @@ namespace _011compressionbw
                         int currentY = y;
                         previousStartingPoint.X = x;
                         previousStartingPoint.Y = y;
+                        int previousAbsDirectionIndex = 0;
                         bool lineContinues = true;
                         int lineLength = 1;
                         while (lineContinues && (lineLength < 256))
                         //while (lineContinues)
                         {
                             lineContinues = false;
-                            for (int directionIndex = 0; directionIndex < neighborhood.Directions.Count; directionIndex++)
+                            for (int relativeDirectionIndex = 0; relativeDirectionIndex < neighborhood.Directions.Count - 1; relativeDirectionIndex++)
                             {
-                                Point direction = neighborhood.Directions[directionIndex];
+                                // absolute
+                                int newAbsDirectionIndex = (previousAbsDirectionIndex + relativeDirectionIndex + neighborhood.Directions.Count - 2) % neighborhood.Directions.Count;
+                                Point direction = neighborhood.Directions[newAbsDirectionIndex];
                                 int nextX = currentX + direction.X;
                                 int nextY = currentY + direction.Y;
                                 if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
@@ -129,8 +129,9 @@ namespace _011compressionbw
                                     currentX = nextX;
                                     currentY = nextY;
                                     //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
-                                    lineDirections.Add(directionIndex);
+                                    //Console.WriteLine("  Direction: {0}, rel: {1}, abs: {2}", direction, relativeDirectionIndex, newAbsDirectionIndex);
+                                    lineDirections.Add(relativeDirectionIndex);
+                                    previousAbsDirectionIndex = newAbsDirectionIndex;
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
@@ -151,9 +152,9 @@ namespace _011compressionbw
                         // write the list of following directions
                         int buffer = 0;
                         int bufferLength = 0;
-                        foreach (int directionIndex in lineDirections)
+                        foreach (int relDirectionIndex in lineDirections)
                         {
-                            buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
+                            buffer = (buffer << neighborhood.SignificantBits) + relDirectionIndex;
                             bufferLength += neighborhood.SignificantBits;
                             int remainingBits = bufferLength - 8; // free space in the byte
                             if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
@@ -183,7 +184,7 @@ namespace _011compressionbw
                 Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
                 Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
                 Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
-                Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
+                //Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
                 Console.WriteLine("Longest line: {0}", longestLine);
                 Console.WriteLine();
             }
@@ -259,9 +260,9 @@ namespace _011compressionbw
                     }
                 }
 
-                Console.WriteLine("Decoding.");
+                //Console.WriteLine("Decoding.");
 
-                // compute bit mask for getting directionIndex bits
+                // compute bit mask for getting relativeDirectionIndex bits
                 int directionBitMask = 0;
                 for (int i = 0; i < neighborhood.SignificantBits; i++)
                 {
@@ -307,6 +308,7 @@ namespace _011compressionbw
                     int bufferLength = 0;
                     int nextX = startX;
                     int nextY = startY;
+                    int previousAbsDirectionIndex = 0;
                     while (directionsRead < directionsCount)
                     {
                         if (bufferLength < neighborhood.SignificantBits)
@@ -318,22 +320,24 @@ namespace _011compressionbw
                             bufferLength += 8;
                         }
 
-                        //read the directionIndex directionIndex
+                        //read the relativeDirectionIndex relativeDirectionIndex
                         int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int relativeDirectionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int newAbsDirectionIndex = (relativeDirectionIndex + previousAbsDirectionIndex + neighborhood.Directions.Count - 2) % neighborhood.Directions.Count;
                         bufferLength -= neighborhood.SignificantBits;
-                        //convert the directions directionIndex to a Point
-                        Point direction = neighborhood.Directions[directionIndex];
+                        //convert the directions relativeDirectionIndex to a Point
+                        Point direction = neighborhood.Directions[newAbsDirectionIndex];
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
+                        //Console.WriteLine("  Direction: {0}, rel: {1}, abs: {2}", direction, relativeDirectionIndex, newAbsDirectionIndex);
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
                         //decodedImage.SetPixel(nextX, nextY, Color.Green);
                         int linePointIntensity = (int)(127.0 * (1.0 - directionsRead / (double)directionsCount));
                         decodedImage.SetPixel(nextX, nextY, Color.FromArgb(0, linePointIntensity, linePointIntensity));
                         directionsRead++;
+                        previousAbsDirectionIndex = newAbsDirectionIndex;
                     }
                 }
                 Console.WriteLine("Successfully decoded.");
@@ -400,34 +404,6 @@ namespace _011compressionbw
 
     }
 
-    interface Predictor
-    {
-        int Predict(Bitmap image, int x, int y);
-    }
-
-    class PreviousLeftPixelPredictor : Predictor
-    {
-        public int Predict(Bitmap image, int x, int y)
-        {
-            int currentPixel = BWImageHelper.GetBWPixel(image, x, y);
-            int leftDiff = BWImageHelper.GetBWPixel(image, x - 1, y);
-            return leftDiff;
-        }
-    }
-
-    class PreviousFourPixelsPredictor : Predictor
-    {
-        public int Predict(Bitmap image, int x, int y)
-        {
-            int currentPixel = BWImageHelper.GetBWPixel(image, x, y);
-            int leftDiff = BWImageHelper.GetBWPixel(image, x - 1, y);
-            int upperDiff = BWImageHelper.GetBWPixel(image, x, y - 1);
-            int leftUpperDiff = BWImageHelper.GetBWPixel(image, x - 1, y - 1);
-            int predicted = leftDiff + upperDiff - leftUpperDiff;
-            return predicted;
-        }
-    }
-
     abstract class Neighborhood
     {
         public List<Point> Directions { get; protected set; }
@@ -452,18 +428,6 @@ namespace _011compressionbw
         }
     }
 
-    class FourNextPixelsNeighborhood : Neighborhood
-    {
-        public static readonly Point RIGHT = new Point(1, 0);
-        public static readonly Point RIGHT_DOWN = new Point(1, 1);
-        public static readonly Point DOWN = new Point(0, 1);
-        public static readonly Point LEFT_DOWN = new Point(-1, 1);
-
-        public FourNextPixelsNeighborhood() {
-            Directions = new List<Point>() { RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN };
-        }
-    }
-
     class EightPixelNeighborhood : Neighborhood
     {
         public static readonly Point RIGHT = new Point(1, 0);
@@ -478,39 +442,10 @@ namespace _011compressionbw
         public EightPixelNeighborhood()
         {
             Directions = new List<Point>() {
-                RIGHT, LEFT, UP, DOWN,
-                RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP
-
                 // default clockwise order:
-                //RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
-                //LEFT, LEFT_UP, UP, RIGHT_UP
+                RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
+                LEFT, LEFT_UP, UP, RIGHT_UP
             };
-        }
-    }
-
-    class SixteenPixelNeighborhood : EightPixelNeighborhood
-    {
-        public SixteenPixelNeighborhood()
-            : base()
-        {
-            Directions.AddRange(new List<Point>() {
-                new Point(2, 0), new Point(2, 2), new Point(0, 2), new Point(-2, 2),
-                new Point(-2, 0), new Point(-2, -2), new Point(0, -2), new Point(2, -2),
-            });
-        }
-    }
-
-    class ThirtyTwoPixelNeighborhood : SixteenPixelNeighborhood
-    {
-        public ThirtyTwoPixelNeighborhood()
-            : base()
-        {
-            Directions.AddRange(new List<Point>() {
-                new Point(2, 1), new Point(1, 2), new Point(-1, 2), new Point(-2, 1),
-                new Point(-2, -1), new Point(-1, -2), new Point(1, -2), new Point(2, -1),
-                new Point(3, 0), new Point(3, 3), new Point(0, 3), new Point(-3, 3),
-                new Point(-3, 0), new Point(-3, -3), new Point(0, -3), new Point(3, -3),
-            });
         }
     }
 
