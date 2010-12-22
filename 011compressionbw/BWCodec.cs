@@ -42,7 +42,7 @@ namespace _011compressionbw
 
             if (width < 1 || height < 1) return;
 
-            int dominantColor = computeDominantColor(inputImage);
+            int backgroundColor = computeDominantColor(inputImage);
 
             Bitmap copyImage = new Bitmap(inputImage);
 
@@ -65,13 +65,13 @@ namespace _011compressionbw
                 ds.WriteByte((byte)(height & 0xff));
 
                 // dominant color
-                ds.WriteByte((byte)(dominantColor & 0x01));
+                ds.WriteByte((byte)(backgroundColor & 0x01));
 
                 // debug counters:
                 int totalPixels = width * height;
                 Console.WriteLine("Total pixels: {0}, [{1}, {2}]", totalPixels, width, height);
 
-                int totalLinePixels = getTotalLinePixels(inputImage, dominantColor);
+                int totalLinePixels = getTotalLinePixels(inputImage, backgroundColor);
                 Console.WriteLine("Total line pixels: {0} ({1} %)", totalLinePixels, 100.0 * totalLinePixels / totalPixels);
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
@@ -89,14 +89,14 @@ namespace _011compressionbw
                     for (int x = 0; x < width; x++)
                     {
                         int bwIntensity = BWImageHelper.GetBWPixel(copyImage, x, y);
-                        if (IsBackground(dominantColor, bwIntensity))
+                        if (IsBackground(backgroundColor, bwIntensity))
                         {
                             continue;
                         }
 
                         // now we have found the first unprocessed non-background pixel
                         //Console.WriteLine("First pixel: [{0}, {1}]", x, y);
-                        BWImageHelper.SetBWPixel(copyImage, x, y, dominantColor);
+                        BWImageHelper.SetBWPixel(copyImage, x, y, backgroundColor);
                         // write position of line's starting pixel
                         // X and Y as two-byte numbers
                         int diffX = x - previousStartingPoint.X;
@@ -124,7 +124,7 @@ namespace _011compressionbw
                                     continue;
                                 }
                                 int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
-                                if (!IsBackground(dominantColor, nextIntensity))
+                                if (!IsBackground(backgroundColor, nextIntensity))
                                 {
                                     currentX = nextX;
                                     currentY = nextY;
@@ -134,7 +134,7 @@ namespace _011compressionbw
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
                                     lineLength++;
-                                    BWImageHelper.SetBWPixel(copyImage, nextX, nextY, dominantColor);
+                                    BWImageHelper.SetBWPixel(copyImage, nextX, nextY, backgroundColor);
                                     break;
                                 }
                             }
@@ -198,9 +198,9 @@ namespace _011compressionbw
             // !!!}}
         }
 
-        private static bool IsBackground(int dominantColor, int bwIntensity)
+        private static bool IsBackground(int backgroundColor, int bwIntensity)
         {
-            return (bwIntensity ^ dominantColor) == 0;
+            return (bwIntensity ^ backgroundColor) == 0;
         }
 
         public Bitmap DecodeImage(Stream inps)
@@ -243,20 +243,19 @@ namespace _011compressionbw
                 if (width < 1 || height < 1)
                     return null;
 
-                // read dominant color
-                int dominantColor = ds.ReadByte();
-                if (dominantColor < 0) return null;
-                int lineColor = 1 - dominantColor;
-
                 decodedImage = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
+                // read dominant color
+                int backgroundColor = ds.ReadByte();
+                if (backgroundColor < 0) return null;
+                int foregroundColor = 1 - backgroundColor;
                 // fill the image with the background color
-                Color backgroundColor = (dominantColor == 0) ? Color.Black : Color.White;
+                Color bgDrawingColor = (backgroundColor == 0) ? Color.Black : Color.White;
                 for (int y = 0; y < height; y++)
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        decodedImage.SetPixel(x, y, backgroundColor);
+                        decodedImage.SetPixel(x, y, bgDrawingColor);
                     }
                 }
 
@@ -296,7 +295,7 @@ namespace _011compressionbw
 
                     //draw the pixel
                     //Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
-                    //BWImageHelper.SetBWPixel(decodedImage, startX, startY, lineColor);
+                    //BWImageHelper.SetBWPixel(decodedImage, startX, startY, foregroundColor);
                     decodedImage.SetPixel(startX, startY, Color.Red);
                     previousStartingPoint.X = startX;
                     previousStartingPoint.Y = startY;
@@ -330,11 +329,13 @@ namespace _011compressionbw
                         nextY += direction.Y;
                         //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
                         //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
-                        //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, lineColor);
+                        //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
                         decodedImage.SetPixel(nextX, nextY, Color.Green);
                         directionsRead++;
                     }
                 }
+                Console.WriteLine("Successfully decoded.");
+                Console.WriteLine();
             }
             finally
             {
@@ -526,15 +527,6 @@ namespace _011compressionbw
         }
 
         public static void SetBWPixel(Bitmap image, int x, int y, int bwIntensity)
-        {
-            if (IsInside(image, x, y))
-            {
-                int intensity = bwIntensity > 0 ? 255 : 0;
-                image.SetPixel(x, y, Color.FromArgb(intensity, intensity, intensity));
-            }
-        }
-
-        public static void BWPixel(Bitmap image, int x, int y, int bwIntensity)
         {
             if (IsInside(image, x, y))
             {
