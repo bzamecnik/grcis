@@ -90,7 +90,7 @@
         // 
         this.labelElapsed.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
         this.labelElapsed.AutoSize = true;
-        this.labelElapsed.Location = new System.Drawing.Point(254, 444);
+        this.labelElapsed.Location = new System.Drawing.Point(252, 446);
         this.labelElapsed.Name = "labelElapsed";
         this.labelElapsed.Size = new System.Drawing.Size(48, 13);
         this.labelElapsed.TabIndex = 8;
@@ -100,7 +100,7 @@
         // 
         this.labelResult.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
         this.labelResult.AutoSize = true;
-        this.labelResult.Location = new System.Drawing.Point(390, 445);
+        this.labelResult.Location = new System.Drawing.Point(389, 446);
         this.labelResult.Name = "labelResult";
         this.labelResult.Size = new System.Drawing.Size(78, 13);
         this.labelResult.TabIndex = 9;
@@ -121,7 +121,7 @@
         // 
         this.checkDiff.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.checkDiff.AutoSize = true;
-        this.checkDiff.Location = new System.Drawing.Point(700, 445);
+        this.checkDiff.Location = new System.Drawing.Point(700, 442);
         this.checkDiff.Name = "checkDiff";
         this.checkDiff.Size = new System.Drawing.Size(76, 17);
         this.checkDiff.TabIndex = 3;
@@ -131,8 +131,9 @@
         // 
         // label1
         // 
+        this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.label1.AutoSize = true;
-        this.label1.Location = new System.Drawing.Point(534, 445);
+        this.label1.Location = new System.Drawing.Point(535, 446);
         this.label1.Name = "label1";
         this.label1.Size = new System.Drawing.Size(78, 13);
         this.label1.TabIndex = 10;
@@ -140,8 +141,9 @@
         // 
         // dominantColorLabel
         // 
+        this.dominantColorLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.dominantColorLabel.AutoSize = true;
-        this.dominantColorLabel.Location = new System.Drawing.Point(619, 444);
+        this.dominantColorLabel.Location = new System.Drawing.Point(619, 446);
         this.dominantColorLabel.Name = "dominantColorLabel";
         this.dominantColorLabel.Size = new System.Drawing.Size(0, 13);
         this.dominantColorLabel.TabIndex = 11;
