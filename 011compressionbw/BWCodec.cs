@@ -15,10 +15,13 @@ namespace _011compressionbw
 
         protected const uint MAGIC = 0xff12fe45;
 
-        protected Predictor Predictor = new PreviousLeftPixelPredictor();
-        Neighborhood neighborhood = new SixteenPixelNeighborhood();
+        //protected Predictor Predictor = new PreviousLeftPixelPredictor();
+        //Neighborhood neighborhood = new SixteenPixelNeighborhood();
         //Neighborhood neighborhood = new EightPixelNeighborhood();
         //Neighborhood neighborhood = new FourNextPixelsNeighborhood();
+
+        DiffNeighborhood diffNeighborhood = new DiffNeighborhood();
+        Neighborhood fourPixelNeighborhood = new FourPixelNeighborhood();
 
         #endregion
 
@@ -110,33 +113,74 @@ namespace _011compressionbw
                         previousStartingPoint.Y = y;
                         bool lineContinues = true;
                         int lineLength = 1;
+                        Point direction = new Point(1, 0);
+                        Point initialDirection = direction;
+
                         while (lineContinues && (lineLength < 256))
                         //while (lineContinues)
                         {
                             lineContinues = false;
-                            for (int directionIndex = 0; directionIndex < neighborhood.Directions.Count; directionIndex++)
+                            bool fgPixelFound = false;
+                            int nextX = currentX;
+                            int nextY = currentY;
+                            if (lineLength == 1)
                             {
-                                Point direction = neighborhood.Directions[directionIndex];
-                                int nextX = currentX + direction.X;
-                                int nextY = currentY + direction.Y;
-                                if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
+                                // choose initial direction
+                                for (int directionIndex = 0; directionIndex < fourPixelNeighborhood.Directions.Count; directionIndex++)
                                 {
-                                    continue;
+                                    direction = fourPixelNeighborhood.Directions[directionIndex];
+                                    nextX = currentX + direction.X;
+                                    nextY = currentY + direction.Y;
+                                    if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
+                                    {
+                                        continue;
+                                    }
+                                    int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
+                                    if (!IsBackground(backgroundColor, nextIntensity))
+                                    {
+                                        fgPixelFound = true;
+                                        initialDirection = direction;
+                                        //Console.WriteLine("Initial direction: {0} (1)", direction, directionIndex);
+                                        break;
+                                    }
                                 }
-                                int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
-                                if (!IsBackground(backgroundColor, nextIntensity))
+                            }
+                            else
+                            {
+                                // choose direction difference
+                                for (int directionDiffIndex = 0; directionDiffIndex < diffNeighborhood.Directions.Count; directionDiffIndex++)
                                 {
-                                    currentX = nextX;
-                                    currentY = nextY;
-                                    //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
-                                    lineDirections.Add(directionIndex);
-                                    lineContinues = true;
-                                    neighborhoodLinePixels++;
-                                    lineLength++;
-                                    BWImageHelper.SetBWPixel(copyImage, nextX, nextY, backgroundColor);
-                                    break;
+                                    Point directionDiff = diffNeighborhood.Directions[directionDiffIndex];
+                                    // rotate the direction diff according to the currect direction
+                                    directionDiff = DiffNeighborhood.Rotate(directionDiff, fourPixelNeighborhood.Directions.IndexOf(direction));
+                                    Point newDirection = new Point(direction.X + directionDiff.X, direction.Y + directionDiff.Y);
+                                    nextX = currentX + newDirection.X;
+                                    nextY = currentY + newDirection.Y;
+                                    if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
+                                    {
+                                        continue;
+                                    }
+                                    int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
+                                    if (!IsBackground(backgroundColor, nextIntensity))
+                                    {
+                                        fgPixelFound = true;
+                                        direction = newDirection;
+                                        lineDirections.Add(directionDiffIndex);
+                                        //Console.WriteLine("Direction diff: {0} ({1})", directionDiff, directionDiffIndex);
+                                        //Console.WriteLine("Direction: {0}", direction);
+                                        break;
+                                    }
                                 }
+                            }
+                            if (fgPixelFound)
+                            {
+                                currentX = nextX;
+                                currentY = nextY;
+                                //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
+                                lineContinues = true;
+                                neighborhoodLinePixels++;
+                                lineLength++;
+                                BWImageHelper.SetBWPixel(copyImage, nextX, nextY, backgroundColor);
                             }
                         }
 
@@ -148,15 +192,23 @@ namespace _011compressionbw
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
 
-                        // write the list of following directions
+                        // write initial direction
                         int buffer = 0;
                         int bufferLength = 0;
+                        if (lineLength > 1)
+                        {
+                            buffer = fourPixelNeighborhood.Directions.IndexOf(initialDirection) & 0x03;
+                            bufferLength = 2;
+                        }
+
+                        // write the list of following directions
+                        
                         foreach (int directionIndex in lineDirections)
                         {
-                            buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
-                            bufferLength += neighborhood.SignificantBits;
+                            buffer = (buffer << diffNeighborhood.SignificantBits) + directionIndex;
+                            bufferLength += diffNeighborhood.SignificantBits;
                             int remainingBits = bufferLength - 8; // free space in the byte
-                            if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
+                            if ((bufferLength >= 8) && (remainingBits < diffNeighborhood.SignificantBits))
                             {
                                 int writtenByte = (buffer >> remainingBits) & 0xff;
                                 ds.WriteByte((byte)(writtenByte & 0xff));
@@ -261,14 +313,11 @@ namespace _011compressionbw
 
                 Console.WriteLine("Decoding.");
 
-                // compute bit mask for getting directionIndex bits
-                int directionBitMask = 0;
-                for (int i = 0; i < neighborhood.SignificantBits; i++)
-                {
-                    directionBitMask += 1 << i;
-                }
+                // compute bit mask for getting directionDiffIndex bits
+                int directionBitMask = -(-1 << diffNeighborhood.SignificantBits) - 1;
 
                 Point previousStartingPoint = new Point();
+                Point direction = new Point(1, 0);
 
                 bool canProcessLines = true;
                 while (canProcessLines) {
@@ -307,9 +356,25 @@ namespace _011compressionbw
                     int bufferLength = 0;
                     int nextX = startX;
                     int nextY = startY;
+
+                    if (directionsCount > 0)
+                    {
+                        buffer = ds.ReadByte();
+                        if (buffer < 0) return null;
+                        direction = fourPixelNeighborhood.Directions[(buffer & 0xc0) >> 6];
+                        bufferLength = 6;
+                        nextX += direction.X;
+                        nextY += direction.Y;
+                        //Console.WriteLine("Initial direction: {0}", direction);
+                        //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
+                        //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
+                        decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        directionsCount--;
+                    }
+
                     while (directionsRead < directionsCount)
                     {
-                        if (bufferLength < neighborhood.SignificantBits)
+                        if (bufferLength < diffNeighborhood.SignificantBits)
                         {
                             buffer &= 0xffff >> (16 - bufferLength);
                             buffer <<= 8;
@@ -318,19 +383,26 @@ namespace _011compressionbw
                             bufferLength += 8;
                         }
 
-                        //read the directionIndex directionIndex
-                        int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
-                        bufferLength -= neighborhood.SignificantBits;
-                        //convert the directions directionIndex to a Point
-                        Point direction = neighborhood.Directions[directionIndex];
+                        //read the directionDiffIndex
+                        int maskOffset = bufferLength - diffNeighborhood.SignificantBits;
+                        int directionDiffIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        bufferLength -= diffNeighborhood.SignificantBits;
+                        //convert the directions directionDiffIndex to a Point
+                        Point directionDiff = diffNeighborhood.Directions[directionDiffIndex];
+                        // rotate the direction diff according to the currect direction
+                        directionDiff = DiffNeighborhood.Rotate(directionDiff, fourPixelNeighborhood.Directions.IndexOf(direction));
+                        direction.X += directionDiff.X;
+                        direction.Y += directionDiff.Y;
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
-                        //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
+                        //Console.WriteLine("Direction diff: {0} ({1})", directionDiff, directionDiffIndex);
+                        //Console.WriteLine("Direction: {0}", direction);
+                        //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);                        
                         //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
-                        decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        //decodedImage.SetPixel(nextX, nextY, Color.Green);
+                        int linePointIntensity = (int)(255.0 * (1.0 - directionsRead / (double)directionsCount));
+                        decodedImage.SetPixel(nextX, nextY, Color.FromArgb(0, linePointIntensity, linePointIntensity));
                         directionsRead++;
                     }
                 }
@@ -462,6 +534,19 @@ namespace _011compressionbw
         }
     }
 
+    class FourPixelNeighborhood : Neighborhood
+    {
+        public static readonly Point RIGHT = new Point(1, 0);
+        public static readonly Point DOWN = new Point(0, 1);
+        public static readonly Point LEFT = new Point(-1, 0);
+        public static readonly Point UP = new Point(0, -1);
+
+        public FourPixelNeighborhood()
+        {
+            Directions = new List<Point>() { RIGHT, DOWN, LEFT, UP };
+        }
+    }
+
     class EightPixelNeighborhood : Neighborhood
     {
         public static readonly Point RIGHT = new Point(1, 0);
@@ -510,6 +595,76 @@ namespace _011compressionbw
                 new Point(-3, 0), new Point(-3, -3), new Point(0, -3), new Point(3, -3),
             });
         }
+    }
+
+    class DiffNeighborhood : Neighborhood
+    {
+        public DiffNeighborhood() {
+            Directions = new List<Point>()
+            {
+                new Point(0,0), new Point(-1, 1), new Point(-1, -1)
+            };
+        }
+
+        public static Point Rotate90(Point directionDiff, bool clockwise)
+        {
+            // 1 = right-down or left-up
+            // -1 = left-down or right-up
+            // 0 = X or Y axis
+            int quadrant = Math.Sign(directionDiff.X * directionDiff.Y);
+            if (quadrant * quadrant * (clockwise ? 1 : -1) > 0)
+            {
+                // mirror around X axis
+                return new Point(-directionDiff.X, directionDiff.Y);
+            }
+            else
+            {
+                // mirror around Y axis
+                return new Point(directionDiff.X, -directionDiff.Y);
+            }
+        }
+
+        public static Point Rotate(Point directionDiff, int times)
+        {
+            int normalizedTimes = (4 + times) % 4;
+            bool quadrant = Math.Sign(directionDiff.X * directionDiff.Y) > 0;
+            switch (normalizedTimes)
+            {
+                case 0: return directionDiff;
+                case 1: return Rotate90(directionDiff, quadrant);
+                case 2: return new Point(-directionDiff.X, -directionDiff.Y);
+                case 3: return Rotate90(directionDiff, !quadrant);
+                default: throw new ArgumentException();
+            }
+        }
+
+        //public static void TestRotate90() {
+        //    List<Point> diffs = new List<Point>() {
+        //        new Point(0,0),
+        //        new Point(1, 1), new Point(1, -1),
+        //        new Point(-1, -1), new Point(-1, 1)
+        //    };
+        //    foreach (Point directionDiff in diffs) {
+        //        Console.WriteLine("{0}, rot clockwise: {1}, rot counter-clockwise: {2}", directionDiff, Rotate90(directionDiff, true), Rotate90(directionDiff, false));
+        //    }
+        //}
+
+        //public static void TestRotate()
+        //{
+        //    List<Point> diffs = new List<Point>() {
+        //        new Point(0,0),
+        //        new Point(1, 1), new Point(-1, 1),
+        //        new Point(-1, -1), new Point(1, -1)
+        //    };
+        //    foreach (Point directionDiff in diffs)
+        //    {
+        //        Console.WriteLine("{0}", directionDiff);
+        //        for (int i = 0; i < 4; i++)
+        //        {
+        //            Console.WriteLine("  rotate {0}-times: {1}", i, Rotate(directionDiff, i));
+        //        }
+        //    }
+        //}
     }
 
     class BWImageHelper
