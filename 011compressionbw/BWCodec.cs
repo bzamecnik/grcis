@@ -41,7 +41,7 @@ namespace _011compressionbw
 
             int backgroundColor = computeDominantColor(inputImage);
 
-            Bitmap copyImage = new Bitmap(inputImage);
+            PixelVisitDirectionsMap visitedDirectionsMap = new PixelVisitDirectionsMap(inputImage, backgroundColor == 0);
 
             // !!!{{ TODO: add the encoding code here
 
@@ -85,15 +85,15 @@ namespace _011compressionbw
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        int bwIntensity = BWImageHelper.GetBWPixel(copyImage, x, y);
-                        if (IsBackground(backgroundColor, bwIntensity))
+
+                        if (visitedDirectionsMap.IsVisited(x, y))
                         {
                             continue;
                         }
 
                         // now we have found the first unprocessed non-background pixel
                         //Console.WriteLine("First pixel: [{0}, {1}]", x, y);
-                        BWImageHelper.SetBWPixel(copyImage, x, y, backgroundColor);
+                        visitedDirectionsMap.SetVisited(x, y, 0);
                         // write position of line's starting pixel
                         // X and Y as two-byte numbers
                         int diffX = x - previousStartingPoint.X;
@@ -112,30 +112,37 @@ namespace _011compressionbw
                         //while (lineContinues)
                         {
                             lineContinues = false;
-                            for (int relativeDirectionIndex = 0; relativeDirectionIndex < neighborhood.Directions.Count - 1; relativeDirectionIndex++)
+                            for (int maxVisitedCount = 1; maxVisitedCount <= 1; maxVisitedCount++)
                             {
-                                // absolute
-                                int newAbsDirectionIndex = (previousAbsDirectionIndex + relativeDirectionIndex + neighborhood.Directions.Count - 2) % neighborhood.Directions.Count;
-                                Point direction = neighborhood.Directions[newAbsDirectionIndex];
-                                int nextX = currentX + direction.X;
-                                int nextY = currentY + direction.Y;
-                                if (!BWImageHelper.IsInside(copyImage, nextX, nextY))
+                                for (int relativeDirectionIndex = 0; relativeDirectionIndex < neighborhood.Directions.Count - 1; relativeDirectionIndex++)
                                 {
-                                    continue;
+                                    // absolute
+                                    int newAbsDirectionIndex = (previousAbsDirectionIndex + relativeDirectionIndex + neighborhood.Directions.Count - 2) % neighborhood.Directions.Count;
+                                    Point direction = neighborhood.Directions[newAbsDirectionIndex];
+                                    int nextX = currentX + direction.X;
+                                    int nextY = currentY + direction.Y;
+                                    if (!BWImageHelper.IsInside(inputImage, nextX, nextY))
+                                    {
+                                        continue;
+                                    }
+                                    //if (visitedDirectionsMap.CanEnter(nextX, nextY, newAbsDirectionIndex))
+                                    if (visitedDirectionsMap.CanEnter(nextX, nextY) && visitedDirectionsMap.IsVisitedAtMostNTimes(nextX, nextY, maxVisitedCount))
+                                    {
+                                        currentX = nextX;
+                                        currentY = nextY;
+                                        //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
+                                        //Console.WriteLine("  Direction: {0}, rel: {1}, abs: {2}", direction, relativeDirectionIndex, newAbsDirectionIndex);
+                                        lineDirections.Add(relativeDirectionIndex);
+                                        previousAbsDirectionIndex = newAbsDirectionIndex;
+                                        lineContinues = true;
+                                        neighborhoodLinePixels++;
+                                        lineLength++;
+                                        visitedDirectionsMap.SetVisited(nextX, nextY, newAbsDirectionIndex);
+                                        break;
+                                    }
                                 }
-                                int nextIntensity = BWImageHelper.GetBWPixel(copyImage, nextX, nextY);
-                                if (!IsBackground(backgroundColor, nextIntensity))
+                                if (lineContinues)
                                 {
-                                    currentX = nextX;
-                                    currentY = nextY;
-                                    //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0}, rel: {1}, abs: {2}", direction, relativeDirectionIndex, newAbsDirectionIndex);
-                                    lineDirections.Add(relativeDirectionIndex);
-                                    previousAbsDirectionIndex = newAbsDirectionIndex;
-                                    lineContinues = true;
-                                    neighborhoodLinePixels++;
-                                    lineLength++;
-                                    BWImageHelper.SetBWPixel(copyImage, nextX, nextY, backgroundColor);
                                     break;
                                 }
                             }
@@ -197,11 +204,6 @@ namespace _011compressionbw
             }
 
             // !!!}}
-        }
-
-        private static bool IsBackground(int backgroundColor, int bwIntensity)
-        {
-            return (bwIntensity ^ backgroundColor) == 0;
         }
 
         public Bitmap DecodeImage(Stream inps)
@@ -383,6 +385,8 @@ namespace _011compressionbw
             return 0;
         }
 
+        
+
         public int getTotalLinePixels(Bitmap image, int dominantColor)
         {
             int totalLinePixels = 0;
@@ -463,6 +467,19 @@ namespace _011compressionbw
             }
         }
 
+        public static int GetPixel(Bitmap image, int x, int y)
+        {
+            if (IsInside(image, x, y))
+            {
+                return image.GetPixel(x, y).R;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+
+        // enteredDirections: 0-1
         public static void SetBWPixel(Bitmap image, int x, int y, int bwIntensity)
         {
             if (IsInside(image, x, y))
@@ -472,9 +489,129 @@ namespace _011compressionbw
             }
         }
 
+        // enteredDirections: 0-255
+        public static void SetPixel(Bitmap image, int x, int y, int intensity)
+        {
+            if (IsInside(image, x, y))
+            {
+                image.SetPixel(x, y, Color.FromArgb(intensity, intensity, intensity));
+            }
+        }
+
         public static bool IsInside(Bitmap image, int x, int y)
         {
             return ((x >= 0) && (x < image.Width) && (y >= 0) && (y < image.Height));
+        }
+
+    }
+
+    /// <summary>
+    /// Represents from which directions each pixel was visited and
+    /// whether it can be visited (again).
+    /// </summary>
+    class PixelVisitDirectionsMap {
+        // meaning of values of pixels in visitDirections:
+        //
+        // Each pixel contains a bit field representing visited directions.
+        // There are 8 directions and 8-bit value.
+        // Each bit in the value is a flag which represent one direction.
+        // If a bit is set, the pixel was visited from the respective direction.
+        // Eg.:
+        //   value = 0 ... the pixel is foreground was never visited
+        //   value = 16 = 1 << (5-1) ... the pixel was visited from the fifth direction
+        //   value = 255 ... the pixel can be visited no more
+        //     (it was a background pixel or was visited from all directions)
+        //
+        // for storing data only Red channel is used
+        //
+        private byte[] visitDirections;
+        private int width;
+        private int height;
+
+        public PixelVisitDirectionsMap(Bitmap originalImage, bool swapColors)
+        {
+            width = originalImage.Width;
+            height = originalImage.Height;
+            visitDirections = new byte[width * height];
+            SetInitialImage(visitDirections, originalImage, swapColors);
+        }
+
+        private void SetInitialImage(byte[] visitDirections, Bitmap originalImage, bool swapColors)
+        {
+            int visitDirectionsIndex = 0;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int value = originalImage.GetPixel(x, y).R;
+                    value = (swapColors) ? 255 - value : value;
+                    visitDirections[visitDirectionsIndex] = (byte)value;
+                    visitDirectionsIndex++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check if the pixel was visited from the specified direction.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="direction">number of direction from which the pixel could be visited [0-7]</param>
+        /// <returns></returns>
+        public bool CanEnter(int x, int y, int direction)
+        {
+            int value = visitDirections[y * width + x];
+            return (value & (1 << direction)) == 0;
+        }
+
+        /// <summary>
+        /// Check if the pixel was visited from any direction.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <returns></returns>
+        public bool CanEnter(int x, int y)
+        {
+            int value = visitDirections[y * width + x];
+            return value < 255;
+        }
+
+        public bool IsVisited(int x, int y)
+        {
+            int value = visitDirections[y * width + x];
+            return value > 0;
+        }
+
+        public bool IsVisitedAtMostNTimes(int x, int y, int maxVisitCount)
+        {
+            // Method of counting bits in a bit field.
+            // Published in 1988, the C Programming Language 2nd Ed. (by Brian W. Kernighan and Dennis M. Ritchie)
+            // taken from Bit Twiddling Hacks
+            // http://www-graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
+
+            // count the number of bits set in value
+            int value = visitDirections[y * width + x];
+            int visitCount; // c accumulates the total bits set in value
+            for (visitCount = 0; value > 0; visitCount++)
+            {
+                //if (visitCount >= maxVisitCount) { return false; }
+                value &= value - 1; // clear the least significant bit set
+            }
+            return (visitCount <= maxVisitCount);
+        }
+
+        /// <summary>
+        /// Set the pixel as visited from the specified direction.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="direction">number of direction from which the pixel was visited [0-7]</param>
+        /// <returns></returns>
+        public void SetVisited(int x, int y, int direction)
+        {
+            int index = y * width + x;
+            byte newValue = (byte) (visitDirections[index] | ((1 << direction) & 0xff));
+            visitDirections[index] = newValue;
         }
 
     }
