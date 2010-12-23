@@ -75,6 +75,8 @@ namespace _011compressionbw
                 Console.WriteLine("Total line pixels: {0} ({1} %)", totalLinePixels, 100.0 * totalLinePixels / totalPixels);
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
+                int totalDirectionIndexBits = 0;
+                int totalDirectionIndexDiffBits = 0;
 
                 Point previousStartingPoint = new Point();
 
@@ -151,9 +153,21 @@ namespace _011compressionbw
                         // write the list of following directions
                         int buffer = 0;
                         int bufferLength = 0;
+                        int previousDirectionIndex = 0;
+                        Console.WriteLine("line len: {0}", lineDirections.Count);
                         foreach (int directionIndex in lineDirections)
                         {
+                            int directionIndexBits = CountBits(directionIndex);
+                            totalDirectionIndexBits += directionIndexBits;
+                            int directionIndexDiff = (directionIndex - previousDirectionIndex + neighborhood.Directions.Count) % neighborhood.Directions.Count;
+                            //int directionIndexDiff = (directionIndex ^ previousDirectionIndex) % neighborhood.Directions.Count;
+                            int directionIndexDiffBits = CountBits(directionIndexDiff);
+                            totalDirectionIndexDiffBits += directionIndexDiff;
+                            previousDirectionIndex = directionIndex;
+                            //Console.WriteLine("dir. index: {0} ({1}), diff: {2} ({3})", directionIndex, directionIndexBits, directionIndexDiff, directionIndexDiffBits);
+                            Console.WriteLine("  dir. index: {0} ({1})", directionIndex, directionIndexBits);
                             buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
+                            //buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
                             bufferLength += neighborhood.SignificantBits;
                             int remainingBits = bufferLength - 8; // free space in the byte
                             if ((bufferLength >= 8) && (remainingBits < neighborhood.SignificantBits))
@@ -174,17 +188,19 @@ namespace _011compressionbw
                             bufferLength = 0;
                         }
 
-                        lineDirections.Clear();
-
                         longestLine = Math.Max(longestLine, lineLength);
+
+                        lineDirections.Clear();
                     }
                 }
 
                 Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
                 Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
                 Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
-                Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
+                //Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
                 Console.WriteLine("Longest line: {0}", longestLine);
+                Console.WriteLine("Total direction index bits: {0} (from {1})", totalDirectionIndexBits, neighborhoodLinePixels * neighborhood.SignificantBits);
+                Console.WriteLine("Total direction index difference bits: {0}", totalDirectionIndexDiffBits);
                 Console.WriteLine();
             }
             finally
@@ -196,6 +212,16 @@ namespace _011compressionbw
             }
 
             // !!!}}
+        }
+
+        private static int CountBits(int number)
+        {
+            int bitCount; // accumulates the total bits set in value
+            for (bitCount = 0; number > 0; bitCount++)
+            {
+                number &= number - 1; // clear the least significant bit set
+            }
+            return bitCount;
         }
 
         private static bool IsBackground(int backgroundColor, int bwIntensity)
@@ -307,6 +333,7 @@ namespace _011compressionbw
                     int bufferLength = 0;
                     int nextX = startX;
                     int nextY = startY;
+                    int previousDirectionIndex = 0;
                     while (directionsRead < directionsCount)
                     {
                         if (bufferLength < neighborhood.SignificantBits)
@@ -320,7 +347,11 @@ namespace _011compressionbw
 
                         //read the directionIndex directionIndex
                         int maskOffset = bufferLength - neighborhood.SignificantBits;
-                        int directionIndex = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int directionIndexDiff = (buffer & (directionBitMask << maskOffset)) >> maskOffset;
+                        int directionIndex = directionIndexDiff;
+                        //int directionIndex = (previousDirectionIndex + directionIndexDiff) % neighborhood.Directions.Count;
+                        //int directionIndex = (previousDirectionIndex ^ directionIndexDiff) % neighborhood.Directions.Count;
+                        previousDirectionIndex = directionIndex;
                         bufferLength -= neighborhood.SignificantBits;
                         //convert the directions directionIndex to a Point
                         Point direction = neighborhood.Directions[directionIndex];
@@ -478,8 +509,10 @@ namespace _011compressionbw
         public EightPixelNeighborhood()
         {
             Directions = new List<Point>() {
-                RIGHT, LEFT, UP, DOWN,
-                RIGHT_DOWN, LEFT_DOWN, RIGHT_UP, LEFT_UP
+                RIGHT,
+                RIGHT_DOWN,
+                DOWN, LEFT, 
+                LEFT_DOWN, UP, RIGHT_UP, LEFT_UP
 
                 // default clockwise order:
                 //RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN,
@@ -494,8 +527,21 @@ namespace _011compressionbw
             : base()
         {
             Directions.AddRange(new List<Point>() {
-                new Point(2, 0), new Point(2, 2), new Point(0, 2), new Point(-2, 2),
-                new Point(-2, 0), new Point(-2, -2), new Point(0, -2), new Point(2, -2),
+                // OK
+                //new Point(2, 0), new Point(2, 2), new Point(0, 2), new Point(-2, 2),
+                //new Point(-2, 0), new Point(-2, -2), new Point(0, -2), new Point(2, -2),
+
+                // better
+                //new Point(2, 1), new Point(2, 2), new Point(1, 2), new Point(-2, 2),
+                //new Point(-2, 1), new Point(-2, -2), new Point(1, -2), new Point(2, -2),
+
+                // still better
+                //new Point(2, 1), new Point(1, 2), new Point(-2, 1), new Point(1, -2),
+                //new Point(2, 2), new Point(-2, 2), new Point(-2, -2), new Point(2, -2),
+
+                // still better
+                new Point(-2, 1), new Point(1, -2), new Point(2, 1), new Point(1, 2), 
+                new Point(2, 2), new Point(-2, 2), new Point(-2, -2), new Point(2, -2),
             });
         }
     }
