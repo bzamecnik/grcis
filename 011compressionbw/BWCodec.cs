@@ -140,9 +140,9 @@ namespace _011compressionbw
                             }
                         }
 
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
+                        // store diffX and diffY as two 12-bit numbers in 3 bytes
+                        ds.WriteByte((byte)((diffX >> 4) & 0xff));
+                        ds.WriteByte((byte)(((diffX & 0x0f) << 4) | ((diffY >> 8) & 0x0f)));
                         ds.WriteByte((byte)(diffY & 0xff));
 
                         // write the number of following directions
@@ -282,13 +282,15 @@ namespace _011compressionbw
 
                     buffer = ds.ReadByte();
                     if (buffer < 0) return null;
-                    diffX = (diffX << 8) + buffer;
+                    diffX = (diffX << 4) | ((buffer & 0xff) >> 4);
+                    // convert negative 12-bit numbers to negative integers
+                    diffX = (short)(diffX | ((diffX & (1 << 11)) >> 11) * 0xf000);
 
-                    int diffY = ds.ReadByte();
-                    if (diffY < 0) return null;
+                    int diffY = buffer & 0x0f;
                     buffer = ds.ReadByte();
                     if (buffer < 0) return null;
-                    diffY = (diffY << 8) + buffer;
+                    diffY = (diffY << 4) | (buffer & 0xff);
+                    diffY = (short)(diffY | ((diffY & (1 << 11)) >> 11) * 0xf000);
 
                     int startX = previousStartingPoint.X + (short) diffX;
                     int startY = previousStartingPoint.Y + (short) diffY;
