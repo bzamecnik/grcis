@@ -154,7 +154,7 @@ namespace _011compressionbw
                         int buffer = 0;
                         int bufferLength = 0;
                         int previousDirectionIndex = 0;
-                        Console.WriteLine("line len: {0}", lineDirections.Count);
+                        //Console.WriteLine("line len: {0}, ", lineDirections.Count);
                         foreach (int directionIndex in lineDirections)
                         {
                             int directionIndexBits = CountBits(directionIndex);
@@ -165,7 +165,8 @@ namespace _011compressionbw
                             totalDirectionIndexDiffBits += directionIndexDiff;
                             previousDirectionIndex = directionIndex;
                             //Console.WriteLine("dir. index: {0} ({1}), diff: {2} ({3})", directionIndex, directionIndexBits, directionIndexDiff, directionIndexDiffBits);
-                            Console.WriteLine("  dir. index: {0} ({1})", directionIndex, directionIndexBits);
+                            //Console.WriteLine("  dir. index: {0} ({1})", directionIndex, directionIndexBits);
+                            //Console.Write(" {0}", directionIndex);
                             buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
                             //buffer = (buffer << neighborhood.SignificantBits) + directionIndex;
                             bufferLength += neighborhood.SignificantBits;
@@ -189,6 +190,8 @@ namespace _011compressionbw
                         }
 
                         longestLine = Math.Max(longestLine, lineLength);
+
+                        //Console.WriteLine();
 
                         lineDirections.Clear();
                     }
