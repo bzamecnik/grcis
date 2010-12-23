@@ -76,6 +76,8 @@ namespace _011compressionbw
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
 
+                int totalStartPixelBits = 0;
+
                 Point previousStartingPoint = new Point();
 
                 int longestLine = 0;
@@ -145,6 +147,8 @@ namespace _011compressionbw
                         ds.WriteByte((byte)(((diffX & 0x0f) << 4) | ((diffY >> 8) & 0x0f)));
                         ds.WriteByte((byte)(diffY & 0xff));
 
+                        totalStartPixelBits += CountBits((((diffX) & 0xfff) << 12) | (diffY & 0xfff));
+
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
 
@@ -183,7 +187,8 @@ namespace _011compressionbw
                 Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
                 Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
                 Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
-                Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
+                //Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
+                Console.WriteLine("Total start pixel bits: {0}", totalStartPixelBits);
                 Console.WriteLine("Longest line: {0}", longestLine);
                 Console.WriteLine();
             }
@@ -351,6 +356,16 @@ namespace _011compressionbw
             return decodedImage;
 
             // !!!}}
+        }
+
+        private static int CountBits(int number)
+        {
+            int bitCount; // accumulates the total bits set in value
+            for (bitCount = 0; number > 0; bitCount++)
+            {
+                number &= number - 1; // clear the least significant bit set
+            }
+            return bitCount;
         }
 
         /// <summary>
