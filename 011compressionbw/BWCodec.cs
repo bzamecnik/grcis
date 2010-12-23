@@ -140,16 +140,30 @@ namespace _011compressionbw
                             }
                         }
 
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffY & 0xff));
+                        // store diffX and diffY as two signed 11-bit numbers in 3 bytes
+                        // |1-bit X sign|11-bit abs(diffX)|1-bit Y sign|11-bit abs(diffY)|
+                        // sign: 0 = positive or zero, 1 = negative
+                        // X sign
+                        Console.WriteLine("Diff: [{0}, {1}]", diffX, diffY);
+                        int buffer = (diffX < 0) ? 1 : 0;
+                        // diff X
+                        buffer <<= 11;
+                        buffer |= Math.Abs(diffX) & 0x07ff;                        
+                        // Y sign
+                        buffer <<= 1;
+                        buffer |= (diffY < 0) ? 1 : 0;
+                        // diff Y
+                        buffer <<= 11;
+                        buffer |= Math.Abs(diffY) & 0x07ff;
+                        ds.WriteByte((byte)((buffer >> 16) & 0xff));
+                        ds.WriteByte((byte)((buffer >> 8) & 0xff));
+                        ds.WriteByte((byte)(buffer & 0xff));
 
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
 
                         // write the list of following directions
-                        int buffer = 0;
+                        buffer = 0;
                         int bufferLength = 0;
                         foreach (int directionIndex in lineDirections)
                         {
@@ -273,22 +287,28 @@ namespace _011compressionbw
                 bool canProcessLines = true;
                 while (canProcessLines) {
                     //read starting pixel position - X, Y
-                    int diffX = ds.ReadByte();
-                    if (diffX < 0)
+                    int readByte = ds.ReadByte();
+                    if (readByte < 0)
                     {
                         canProcessLines = false;
                         break;
                     }
+                    buffer = readByte;
 
-                    buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
-                    diffX = (diffX << 8) + buffer;
+                    readByte = ds.ReadByte();
+                    if (readByte < 0) return null;
+                    buffer = (buffer << 8) | readByte;
+                    readByte = ds.ReadByte();
+                    if (readByte < 0) return null;
+                    buffer = (buffer << 8) | readByte;
+                   
+                    int signX = ((buffer & (1 << 23)) == 0) ? 1 : -1;
+                    int diffX = signX * ((buffer & ((-(-1 << 11) - 1) << 12)) >> 12);
 
-                    int diffY = ds.ReadByte();
-                    if (diffY < 0) return null;
-                    buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
-                    diffY = (diffY << 8) + buffer;
+                    int signY = ((buffer & (1 << 11)) == 0) ? 1 : -1;
+                    int diffY = signY * (buffer & (-(-1 << 11) - 1));
+
+                    Console.WriteLine("Diff: [{0}, {1}]", diffX, diffY);
 
                     int startX = previousStartingPoint.X + (short) diffX;
                     int startY = previousStartingPoint.Y + (short) diffY;
