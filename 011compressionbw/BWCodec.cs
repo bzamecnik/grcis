@@ -11,14 +11,17 @@ namespace _011compressionbw
 {
     class BWCodec
     {
+        public bool TraceEnabled { get; set; }
+
+        public bool InfoEnabled { get; set; }
+
+        public bool UseFalseColors { get; set; }
+
         #region protected data
 
         protected const uint MAGIC = 0xff12fe45;
 
-        protected Predictor Predictor = new PreviousLeftPixelPredictor();
-        Neighborhood neighborhood = new SixteenPixelNeighborhood();
-        //Neighborhood neighborhood = new EightPixelNeighborhood();
-        //Neighborhood neighborhood = new FourNextPixelsNeighborhood();
+        protected Neighborhood neighborhood = new SixteenPixelNeighborhood();
 
         #endregion
 
@@ -26,6 +29,9 @@ namespace _011compressionbw
 
         public BWCodec()
         {
+            TraceEnabled = false;
+            InfoEnabled = false;
+            UseFalseColors = false;
         }
 
         #endregion
@@ -42,11 +48,9 @@ namespace _011compressionbw
 
             if (width < 1 || height < 1) return;
 
-            int backgroundColor = computeDominantColor(inputImage);
+            int backgroundColor = ComputeDominantColor(inputImage);
 
             Bitmap copyImage = new Bitmap(inputImage);
-
-            // !!!{{ TODO: add the encoding code here
 
             DeflateStream ds = new BufferedDeflateStream(16384, outputStream, CompressionMode.Compress, true);
 
@@ -69,10 +73,16 @@ namespace _011compressionbw
 
                 // debug counters:
                 int totalPixels = width * height;
-                Console.WriteLine("Total pixels: {0}, [{1}, {2}]", totalPixels, width, height);
+                if (InfoEnabled)
+                {
+                    Console.WriteLine("Total pixels: {0}, [{1}, {2}]", totalPixels, width, height);
+                }
 
-                int totalLinePixels = getTotalLinePixels(inputImage, backgroundColor);
-                Console.WriteLine("Total line pixels: {0} ({1} %)", totalLinePixels, 100.0 * totalLinePixels / totalPixels);
+                int totalLinePixels = GetTotalLinePixels(inputImage, backgroundColor);
+                if (InfoEnabled)
+                {
+                    Console.WriteLine("Total line pixels: {0} ({1} %)", totalLinePixels, 100.0 * totalLinePixels / totalPixels);
+                }
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
 
@@ -82,7 +92,10 @@ namespace _011compressionbw
 
                 List<int> lineDirections = new List<int>();
 
-                Console.WriteLine("Encoding.");
+                if (TraceEnabled)
+                {
+                    Console.WriteLine("Encoding.");
+                }
 
                 for (int y = 0; y < height; y++)
                 {
@@ -95,7 +108,10 @@ namespace _011compressionbw
                         }
 
                         // now we have found the first unprocessed non-background pixel
-                        //Console.WriteLine("First pixel: [{0}, {1}]", x, y);
+                        if (TraceEnabled)
+                        {
+                            Console.WriteLine("First pixel: [{0}, {1}]", x, y);
+                        }
                         BWImageHelper.SetBWPixel(copyImage, x, y, backgroundColor);
                         // write position of line's starting pixel
                         // X and Y as two-byte numbers
@@ -128,8 +144,11 @@ namespace _011compressionbw
                                 {
                                     currentX = nextX;
                                     currentY = nextY;
-                                    //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                                    //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
+                                    if (TraceEnabled)
+                                    {
+                                        Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
+                                        Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
+                                    }
                                     lineDirections.Add(directionIndex);
                                     lineContinues = true;
                                     neighborhoodLinePixels++;
@@ -180,12 +199,14 @@ namespace _011compressionbw
                     }
                 }
 
-                Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
-                Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
-                Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
-                Console.WriteLine("OK: {0}", totalLinePixels == (firstLinePixels + neighborhoodLinePixels));
-                Console.WriteLine("Longest line: {0}", longestLine);
-                Console.WriteLine();
+                if (InfoEnabled)
+                {
+                    Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
+                    Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
+                    Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
+                    Console.WriteLine("Longest line: {0}", longestLine);
+                    Console.WriteLine();
+                }
             }
             finally
             {
@@ -194,8 +215,6 @@ namespace _011compressionbw
                     ds.Close();
                 }
             }
-
-            // !!!}}
         }
 
         private static bool IsBackground(int backgroundColor, int bwIntensity)
@@ -206,8 +225,6 @@ namespace _011compressionbw
         public Bitmap DecodeImage(Stream inps)
         {
             if (inps == null) return null;
-
-            // !!!{{ TODO: add the decoding code here
 
             DeflateStream ds = new DeflateStream(inps, CompressionMode.Decompress, true);
             Bitmap decodedImage = null;
@@ -259,7 +276,10 @@ namespace _011compressionbw
                     }
                 }
 
-                Console.WriteLine("Decoding.");
+                if (TraceEnabled)
+                {
+                    Console.WriteLine("Decoding.");
+                }
 
                 // compute bit mask for getting directionIndex bits
                 int directionBitMask = 0;
@@ -294,9 +314,18 @@ namespace _011compressionbw
                     int startY = previousStartingPoint.Y + (short) diffY;
 
                     //draw the pixel
-                    //Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
-                    //BWImageHelper.SetBWPixel(decodedImage, startX, startY, foregroundColor);
-                    decodedImage.SetPixel(startX, startY, Color.Red);
+                    if (TraceEnabled)
+                    {
+                        Console.WriteLine("First pixel: [{0}, {1}]", startX, startY);
+                    }
+                    if (UseFalseColors)
+                    {
+                        decodedImage.SetPixel(startX, startY, Color.Red);
+                    }
+                    else
+                    {
+                        BWImageHelper.SetBWPixel(decodedImage, startX, startY, foregroundColor);
+                    }
                     previousStartingPoint.X = startX;
                     previousStartingPoint.Y = startY;
 
@@ -327,17 +356,29 @@ namespace _011compressionbw
                         //compute the next pixel and draw it
                         nextX += direction.X;
                         nextY += direction.Y;
-                        //Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
-                        //Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
-                        //BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
-                        //decodedImage.SetPixel(nextX, nextY, Color.Green);
-                        int linePointIntensity = (int)(127.0 * (1.0 - directionsRead / (double)directionsCount));
-                        decodedImage.SetPixel(nextX, nextY, Color.FromArgb(0, linePointIntensity, linePointIntensity));
+                        if (TraceEnabled)
+                        {
+                            Console.WriteLine("Neighbor pixel: [{0}, {1}]", nextX, nextY);
+                            Console.WriteLine("  Direction: {0} ({1})", direction, directionIndex);
+                        }
+                        if (UseFalseColors)
+                        {
+                            //decodedImage.SetPixel(nextX, nextY, Color.Green);
+                            int linePointIntensity = (int)(127.0 * (1.0 - directionsRead / (double)directionsCount));
+                            decodedImage.SetPixel(nextX, nextY, Color.FromArgb(0, linePointIntensity, linePointIntensity));
+                        }
+                        else
+                        {
+                            BWImageHelper.SetBWPixel(decodedImage, nextX, nextY, foregroundColor);
+                        }
                         directionsRead++;
                     }
                 }
-                Console.WriteLine("Successfully decoded.");
-                Console.WriteLine();
+                if (TraceEnabled)
+                {
+                    Console.WriteLine("Successfully decoded.");
+                    Console.WriteLine();
+                }
             }
             finally
             {
@@ -347,8 +388,6 @@ namespace _011compressionbw
                 }
             }
             return decodedImage;
-
-            // !!!}}
         }
 
         /// <summary>
@@ -359,7 +398,7 @@ namespace _011compressionbw
         /// </summary>
         /// <param name="image"></param>
         /// <returns>0 if black is dominant, 1 if white is dominant</returns>
-        public int computeDominantColor(Bitmap image)
+        public int ComputeDominantColor(Bitmap image)
         {
             // the least half of pixels must be white for white to be the
             // dominant color
@@ -379,7 +418,7 @@ namespace _011compressionbw
             return 0;
         }
 
-        public int getTotalLinePixels(Bitmap image, int dominantColor)
+        public int GetTotalLinePixels(Bitmap image, int backgroundColor)
         {
             int totalLinePixels = 0;
             for (int y = 0; y < image.Height; y++)
@@ -387,7 +426,7 @@ namespace _011compressionbw
                 for (int x = 0; x < image.Width; x++)
                 {
                     int intensity = BWImageHelper.GetBWPixel(image, x, y);
-                    if (intensity != dominantColor)
+                    if (intensity != backgroundColor)
                     {
                         totalLinePixels++;
                     }
@@ -398,34 +437,6 @@ namespace _011compressionbw
 
         #endregion
 
-    }
-
-    interface Predictor
-    {
-        int Predict(Bitmap image, int x, int y);
-    }
-
-    class PreviousLeftPixelPredictor : Predictor
-    {
-        public int Predict(Bitmap image, int x, int y)
-        {
-            int currentPixel = BWImageHelper.GetBWPixel(image, x, y);
-            int leftDiff = BWImageHelper.GetBWPixel(image, x - 1, y);
-            return leftDiff;
-        }
-    }
-
-    class PreviousFourPixelsPredictor : Predictor
-    {
-        public int Predict(Bitmap image, int x, int y)
-        {
-            int currentPixel = BWImageHelper.GetBWPixel(image, x, y);
-            int leftDiff = BWImageHelper.GetBWPixel(image, x - 1, y);
-            int upperDiff = BWImageHelper.GetBWPixel(image, x, y - 1);
-            int leftUpperDiff = BWImageHelper.GetBWPixel(image, x - 1, y - 1);
-            int predicted = leftDiff + upperDiff - leftUpperDiff;
-            return predicted;
-        }
     }
 
     abstract class Neighborhood
@@ -449,18 +460,6 @@ namespace _011compressionbw
             {
                 return 0;
             }
-        }
-    }
-
-    class FourNextPixelsNeighborhood : Neighborhood
-    {
-        public static readonly Point RIGHT = new Point(1, 0);
-        public static readonly Point RIGHT_DOWN = new Point(1, 1);
-        public static readonly Point DOWN = new Point(0, 1);
-        public static readonly Point LEFT_DOWN = new Point(-1, 1);
-
-        public FourNextPixelsNeighborhood() {
-            Directions = new List<Point>() { RIGHT, RIGHT_DOWN, DOWN, LEFT_DOWN };
         }
     }
 
@@ -496,20 +495,6 @@ namespace _011compressionbw
             Directions.AddRange(new List<Point>() {
                 new Point(2, 0), new Point(2, 2), new Point(0, 2), new Point(-2, 2),
                 new Point(-2, 0), new Point(-2, -2), new Point(0, -2), new Point(2, -2),
-            });
-        }
-    }
-
-    class ThirtyTwoPixelNeighborhood : SixteenPixelNeighborhood
-    {
-        public ThirtyTwoPixelNeighborhood()
-            : base()
-        {
-            Directions.AddRange(new List<Point>() {
-                new Point(2, 1), new Point(1, 2), new Point(-1, 2), new Point(-2, 1),
-                new Point(-2, -1), new Point(-1, -2), new Point(1, -2), new Point(2, -1),
-                new Point(3, 0), new Point(3, 3), new Point(0, 3), new Point(-3, 3),
-                new Point(-3, 0), new Point(-3, -3), new Point(0, -3), new Point(3, -3),
             });
         }
     }

@@ -88,7 +88,7 @@ namespace _011compressionbw
         outputImage = diffImage = null;
       }
 
-      dominantColorLabel.Text = (codec.computeDominantColor(inputImage) == 0) ? "black" : "white";
+      dominantColorLabel.Text = (codec.ComputeDominantColor(inputImage) == 0) ? "black" : "white";
 
       Cursor.Current = Cursors.Default;
     }
