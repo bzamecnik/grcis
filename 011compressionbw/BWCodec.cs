@@ -86,6 +86,8 @@ namespace _011compressionbw
                 int firstLinePixels = 0;
                 int neighborhoodLinePixels = 0;
 
+                int totalStartPixelBits = 0;
+
                 Point previousStartingPoint = new Point();
 
                 int longestLine = 0;
@@ -159,16 +161,32 @@ namespace _011compressionbw
                             }
                         }
 
-                        ds.WriteByte((byte)((diffX >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffX & 0xff));
-                        ds.WriteByte((byte)((diffY >> 8) & 0xff));
-                        ds.WriteByte((byte)(diffY & 0xff));
+                        // store diffX and diffY as two signed 11-bit numbers in 3 bytes
+                        // |1-bit X sign|11-bit abs(diffX)|1-bit Y sign|11-bit abs(diffY)|
+                        // sign: 0 = positive or zero, 1 = negative
+                        // X sign
+                        //Console.WriteLine("Diff: [{0}, {1}]", diffX, diffY);
+                        int buffer = (diffX < 0) ? 1 : 0;
+                        // diff X
+                        buffer <<= 11;
+                        buffer |= Math.Abs(diffX) & 0x07ff;                        
+                        // Y sign
+                        buffer <<= 1;
+                        buffer |= (diffY < 0) ? 1 : 0;
+                        // diff Y
+                        buffer <<= 11;
+                        buffer |= Math.Abs(diffY) & 0x07ff;
+                        ds.WriteByte((byte)((buffer >> 16) & 0xff));
+                        ds.WriteByte((byte)((buffer >> 8) & 0xff));
+                        ds.WriteByte((byte)(buffer & 0xff));
+
+                        totalStartPixelBits += CountBits(buffer);
 
                         // write the number of following directions
                         ds.WriteByte((byte)((lineLength - 1) & 0xff));
 
                         // write the list of following directions
-                        int buffer = 0;
+                        buffer = 0;
                         int bufferLength = 0;
                         foreach (int directionIndex in lineDirections)
                         {
@@ -204,6 +222,7 @@ namespace _011compressionbw
                     Console.WriteLine("Total first pixels: {0} ({1} %) ({2} %)", firstLinePixels, 100.0 * firstLinePixels / totalPixels, 100.0 * firstLinePixels / totalLinePixels);
                     Console.WriteLine("Total neighborhood pixels: {0} ({1} %) ({2} %)", neighborhoodLinePixels, 100.0 * neighborhoodLinePixels / totalPixels, 100.0 * neighborhoodLinePixels / totalLinePixels);
                     Console.WriteLine("First + neighborhood: {0}", firstLinePixels + neighborhoodLinePixels);
+                Console.WriteLine("Total start pixel bits: {0}", totalStartPixelBits);
                     Console.WriteLine("Longest line: {0}", longestLine);
                     Console.WriteLine();
                 }
@@ -293,22 +312,28 @@ namespace _011compressionbw
                 bool canProcessLines = true;
                 while (canProcessLines) {
                     //read starting pixel position - X, Y
-                    int diffX = ds.ReadByte();
-                    if (diffX < 0)
+                    int readByte = ds.ReadByte();
+                    if (readByte < 0)
                     {
                         canProcessLines = false;
                         break;
                     }
+                    buffer = readByte;
 
-                    buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
-                    diffX = (diffX << 8) + buffer;
+                    readByte = ds.ReadByte();
+                    if (readByte < 0) return null;
+                    buffer = (buffer << 8) | readByte;
+                    readByte = ds.ReadByte();
+                    if (readByte < 0) return null;
+                    buffer = (buffer << 8) | readByte;
+                   
+                    int signX = ((buffer & (1 << 23)) == 0) ? 1 : -1;
+                    int diffX = signX * ((buffer & ((-(-1 << 11) - 1) << 12)) >> 12);
 
-                    int diffY = ds.ReadByte();
-                    if (diffY < 0) return null;
-                    buffer = ds.ReadByte();
-                    if (buffer < 0) return null;
-                    diffY = (diffY << 8) + buffer;
+                    int signY = ((buffer & (1 << 11)) == 0) ? 1 : -1;
+                    int diffY = signY * (buffer & (-(-1 << 11) - 1));
+
+                    //Console.WriteLine("Diff: [{0}, {1}]", diffX, diffY);
 
                     int startX = previousStartingPoint.X + (short) diffX;
                     int startY = previousStartingPoint.Y + (short) diffY;
@@ -388,6 +413,16 @@ namespace _011compressionbw
                 }
             }
             return decodedImage;
+        }
+
+        private static int CountBits(int number)
+        {
+            int bitCount; // accumulates the total bits set in value
+            for (bitCount = 0; number > 0; bitCount++)
+            {
+                number &= number - 1; // clear the least significant bit set
+            }
+            return bitCount;
         }
 
         /// <summary>
