@@ -8,7 +8,7 @@ Základní algoritmus:
 	- zapsat tuto informaci do vıstupu
 - popsat jednotlivé èáry
 	- BÚNO èáry jsou èerné
-	- procházek postupnì pixely
+	- procházet postupnì pixely
 		- napø. pøedpokládejme, e v bìném skenovacím poøadí:
 			- pro všechny øádky shora dolù
 				- pro všechny sloupce zleva doprava
@@ -25,4 +25,37 @@ Další úpravy:
 - okolí nezkoumat ve stejném poøadí, ale toto poøadí predikovat
 	- napø. podle poslední volby smìru
 		- to by se mohlo hodit na delší èáry, které vedou jedním smìrem
-  
+
+*- pouít 8-okolí
+
+*- místo pozice prvního pixelu èáry uloit jen diferenci vùèi pøedchozí pozici
+
+- pro kadou èáru nastavit zvláš potøebnı poèet bitù pro smìry
+	- vdy zjistit max. poèet bitù z nejvyššího pouitého èísla smìru
+	- rozdìlit cesty na bloky podle nutného poètu bitù
+		- trade-off by se hledat relativnì sloitì
+
+- vıborné by bylo vùbec nepracovat s byty, ale jen se streamem bitù
+
+- pozice startovních bodù by šlo reprezentovat s variabilním poètem bitù
+	- pro kadou pozici poèet bitù zvláš
+		- nutné explicitnì uvádìt poèet bitù
+		- pro malé kladné diference by to mohlo bıt relativnì vıhodné
+	- šlo by pouít nejmenší monı poèet bitù podle velikosti obrázku
+		- klidnì i pro kadou sloku (X,Y) zvláš 
+		- asi mnohem úspornìjší ne pro kadou pozici zvláš
+
+- pro pozice startovních pixelù vyjídøit explicitnì znaménko a kladnou velikost
+
+==== reprezentace ====
+
+- pro kadou cestu zadat:
+	- souøadnice poèátku
+		- dva integery - staèilo by dvoubytové shorty
+	- délka cesty
+		- šlo by omezit délku cesty na 256, aby se vešla do jednoho bytu
+			- poèet cest se dramaticky nezvıší, ale pro kadou cestu pak staèí jen jeden byte
+			- vypadá to, e se to chová lépe, ne dva byty pro cesty do délky 65536
+	- smìry pro další pixely po cestì
+		- pro ètyøi smìry staèí 2 bity / smìr
+		- pro osm smìrù staèí 3 bity / smìr
