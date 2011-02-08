@@ -89,12 +89,16 @@ namespace _016videoslow
       outs.WriteByte( (byte)((frameNo >> 8) & 0xff) );
       outs.WriteByte( (byte)(frameNo        & 0xff) );
 
-      for ( int y = 0; y < frameHeight; y++ )
-        for ( int x = 0; x < frameWidth; x++ )
-        {
-          byte gr = (byte)(inp.GetPixel( x, y ).GetBrightness() * 255.0f);
-          outs.WriteByte( gr );
-        }
+      for (int y = 0; y < frameHeight; y++)
+      {
+          for (int x = 0; x < frameWidth; x++)
+          {
+              Color pixelColor = inp.GetPixel(x, y);
+              outs.WriteByte(pixelColor.R);
+              outs.WriteByte(pixelColor.G);
+              outs.WriteByte(pixelColor.B);
+          }
+      }
 
       // !!!}}
     }
@@ -165,12 +169,16 @@ namespace _016videoslow
 
       Bitmap result = new Bitmap( frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb );
 
-      for ( int y = 0; y < frameHeight; y++ )
-        for ( int x = 0; x < frameWidth; x++ )
-        {
-          int gr = inps.ReadByte();
-          result.SetPixel( x, y, Color.FromArgb( gr, gr, gr ) );
-        }
+      for (int y = 0; y < frameHeight; y++)
+      {
+          for (int x = 0; x < frameWidth; x++)
+          {
+              int r = inps.ReadByte();
+              int g = inps.ReadByte();
+              int b = inps.ReadByte();
+              result.SetPixel(x, y, Color.FromArgb(r, g, b));
+          }
+      }
 
       return result;
 
