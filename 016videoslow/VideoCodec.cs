@@ -47,7 +47,7 @@ namespace _016videoslow
             frameWidth = width;
             frameHeight = height;
             framesPerSecond = fps;
-            //previousFrame = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            previousFrame = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
             // video header: [ MAGIC, width, height, fps ]
             ds.WriteUInt(MAGIC);
@@ -77,17 +77,14 @@ namespace _016videoslow
                 for (int x = 0; x < frameWidth; x++)
                 {
                     Color actualColor = inputFrame.GetPixel(x, y);
-                    //Color predictedColor = previousFrame.GetPixel(x, y);
-                    //outStream.WriteShort((short)(pixelColor.R - predictedColor.R));
-                    //outStream.WriteShort((short)(pixelColor.G - predictedColor.G));
-                    //outStream.WriteShort((short)(pixelColor.B - predictedColor.B));
-                    outStream.WriteByte(actualColor.R);
-                    outStream.WriteByte(actualColor.G);
-                    outStream.WriteByte(actualColor.B);
+                    Color predictedColor = previousFrame.GetPixel(x, y);
+                    outStream.WriteShort((short)(actualColor.R - predictedColor.R));
+                    outStream.WriteShort((short)(actualColor.G - predictedColor.G));
+                    outStream.WriteShort((short)(actualColor.B - predictedColor.B));
                 }
             }
 
-            //previousFrame = inputFrame;
+            previousFrame = inputFrame;
         }
 
         public Stream DecodeHeader(Stream inStream)
@@ -105,12 +102,12 @@ namespace _016videoslow
                 frameHeight = ds.ReadShort();
                 framesPerSecond = ds.ReadShort() * 0.01f;
             }
-            catch (EndOfStreamException ex)
+            catch (EndOfStreamException)
             {
                 return null;
             }
 
-            //previousFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            previousFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
             return ds;
         }
@@ -130,28 +127,22 @@ namespace _016videoslow
 
                 result = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
-                //short[] diff = new short[3];
-                byte[] pixelColor = new byte[3];
+                short[] diff = new short[3];
                 for (int y = 0; y < frameHeight; y++)
                 {
                     for (int x = 0; x < frameWidth; x++)
                     {
-                        //for (int band = 0; band < diff.Length; band++)
-                        //{
-                        //    diff[band] = inStream.ReadShort();
-                        //}
-                        //Color predicted = previousFrame.GetPixel(x, y);
-                        //Color actual = Color.FromArgb(predicted.R + diff[0], predicted.G + diff[1], predicted.B + diff[2]);
-                        //result.SetPixel(x, y, actual);
-                        for (int band = 0; band < pixelColor.Length; band++)
+                        for (int band = 0; band < diff.Length; band++)
                         {
-                            pixelColor[band] = Extensions.ReadByte(inStream);
+                            diff[band] = inStream.ReadShort();
                         }
-                        result.SetPixel(x, y, Color.FromArgb(pixelColor[0], pixelColor[1], pixelColor[2]));
+                        Color predicted = previousFrame.GetPixel(x, y);
+                        Color actual = Color.FromArgb(predicted.R + diff[0], predicted.G + diff[1], predicted.B + diff[2]);
+                        result.SetPixel(x, y, actual);
                     }
                 }
             }
-            catch (EndOfStreamException ex)
+            catch (EndOfStreamException)
             {
                 return null;
             }
