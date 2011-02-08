@@ -80,55 +80,93 @@ namespace _016videoslow
                 return;
 
             FileStream fs = new FileStream(videoFileName = sfd.FileName, FileMode.Create);
-            Stream s;
+            Stream outStream;
 
-            string fn = String.Format(textInputMask.Text, 0);
-            if (File.Exists(fn))
+            string imageFileName = String.Format(textInputMask.Text, 0);
+            if (!File.Exists(imageFileName))
             {
-                VideoCodec vc = new VideoCodec();
-
-                frameImage = (Bitmap)Image.FromFile(fn);
-                s = vc.EncodeHeader(frameImage.Width, frameImage.Height, (float)numericFps.Value, fs);
-                int i = 0;
-                do
-                {
-                    vc.EncodeFrame(i, frameImage, s);
-                    fn = String.Format(textInputMask.Text, ++i);
-                    if (!File.Exists(fn)) break;
-                    frameImage = (Bitmap)Image.FromFile(fn);
-                } while (true);
-
-                s.Close();
-                fs.Close();
+                return;
             }
+
+            StreamWriter log = new StreamWriter(new FileStream("encodelog.txt", FileMode.Create));
+            log.WriteLine("Encoding an image sequence into a compressed video file: " + videoFileName);
+            Stopwatch watch = new Stopwatch();
+            watch.Reset();
+            watch.Start();
+            long lastWatchTime = 0;
+
+            frameImage = (Bitmap)Image.FromFile(imageFileName);
+            lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+
+            VideoCodec codec = new VideoCodec();
+            outStream = codec.EncodeHeader(frameImage.Width, frameImage.Height, (float)numericFps.Value, fs);
+            lastWatchTime = LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
+            int frameIndex = 0;
+            do
+            {
+                codec.EncodeFrame(frameIndex, frameImage, outStream);
+                lastWatchTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+
+                imageFileName = String.Format(textInputMask.Text, ++frameIndex);
+                if (!File.Exists(imageFileName)) break;
+                frameImage = (Bitmap)Image.FromFile(imageFileName);
+                lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+            } while (true);
+
+            outStream.Close();
+            fs.Close();
+            log.WriteLine("Finished encoding the seqence. Total time: {0} ms.", watch.ElapsedMilliseconds);
+            watch.Stop();
+            log.Close();
+        }
+
+        private static long LogCurrentStopwatchState(string message, StreamWriter log, Stopwatch watch, long lastWatchTime)
+        {
+            long currentWatchTime = watch.ElapsedMilliseconds;
+            log.WriteLine(message, currentWatchTime - lastWatchTime);
+            return currentWatchTime;
         }
 
         private void buttonDecode_Click(object sender, EventArgs e)
         {
-            string fn = String.Format(textOutputMask.Text, 0);
-            string dir = Path.GetDirectoryName(fn);
+            string imageFileName = String.Format(textOutputMask.Text, 0);
+            string dir = Path.GetDirectoryName(imageFileName);
             Directory.CreateDirectory(dir);
 
             FileStream fs = new FileStream(videoFileName, FileMode.Open);
-            Stream s;
-
-            if (fs != null)
+            
+            if (fs == null)
             {
-                VideoCodec vc = new VideoCodec();
-                s = vc.DecodeHeader(fs);
-                int i = 0;
-                do
-                {
-                    frameImage = vc.DecodeFrame(i, s);
-                    if (frameImage == null) break;
-                    fn = String.Format(textOutputMask.Text, i++);
-                    frameImage.Save(fn, ImageFormat.Png);
-                }
-                while (true);
-
-                s.Close();
-                fs.Close();
+                return;
             }
+
+            VideoCodec codec = new VideoCodec();
+            StreamWriter log = new StreamWriter(new FileStream("decodelog.txt", FileMode.Create));
+            log.WriteLine("Decoding an image sequence from a compressed video file: " + videoFileName);
+            Stopwatch watch = new Stopwatch();
+            watch.Reset();
+            watch.Start();
+            long lastWatchTime = 0;
+
+            Stream inStream = codec.DecodeHeader(fs);
+            lastWatchTime = LogCurrentStopwatchState("Decoded header in {0} ms.", log, watch, lastWatchTime);
+            int frameIndex = 0;
+            do
+            {
+                frameImage = codec.DecodeFrame(frameIndex, inStream);
+                if (frameImage == null) break;
+                lastWatchTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                imageFileName = String.Format(textOutputMask.Text, frameIndex++);
+                frameImage.Save(imageFileName, ImageFormat.Png);
+                lastWatchTime = LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+            }
+            while (true);
+
+            inStream.Close();
+            fs.Close();
+            log.WriteLine("Finished decoding the seqence. Total time: {0} ms.", watch.ElapsedMilliseconds);
+            watch.Stop();
+            log.Close();
         }
     }
 }
