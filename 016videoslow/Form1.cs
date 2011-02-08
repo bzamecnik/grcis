@@ -99,6 +99,7 @@ namespace _016videoslow
                 } while (true);
 
                 s.Close();
+                fs.Close();
             }
         }
 
@@ -119,13 +120,14 @@ namespace _016videoslow
                 do
                 {
                     frameImage = vc.DecodeFrame(i, s);
-                    if (frameImage == null) return;
+                    if (frameImage == null) break;
                     fn = String.Format(textOutputMask.Text, i++);
                     frameImage.Save(fn, ImageFormat.Png);
                 }
                 while (true);
 
                 s.Close();
+                fs.Close();
             }
         }
     }
