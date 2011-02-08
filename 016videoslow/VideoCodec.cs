@@ -24,6 +24,7 @@ namespace _016videoslow
 
         protected float framesPerSecond = 0.0f;
 
+        protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
         #endregion
@@ -69,7 +70,6 @@ namespace _016videoslow
 
             // frame header: [ MAGIC_FRAME, frameIndex ]
             outStream.WriteUInt(MAGIC_FRAME);
-
             outStream.WriteShort((short)frameIndex);
 
             for (int y = 0; y < frameHeight; y++)
@@ -108,6 +108,7 @@ namespace _016videoslow
             }
 
             previousFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            currentFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
             return ds;
         }
@@ -116,7 +117,6 @@ namespace _016videoslow
         {
             if (inStream == null) return null;
 
-            Bitmap result = null;
             try
             {
                 // Check the frame header:
@@ -124,8 +124,6 @@ namespace _016videoslow
 
                 int encodedFrameIndex = inStream.ReadShort();
                 if (encodedFrameIndex != frameIndex) return null;
-
-                result = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
                 short[] diff = new short[3];
                 for (int y = 0; y < frameHeight; y++)
@@ -138,7 +136,7 @@ namespace _016videoslow
                         }
                         Color predicted = previousFrame.GetPixel(x, y);
                         Color actual = Color.FromArgb(predicted.R + diff[0], predicted.G + diff[1], predicted.B + diff[2]);
-                        result.SetPixel(x, y, actual);
+                        currentFrame.SetPixel(x, y, actual);
                     }
                 }
             }
@@ -147,9 +145,19 @@ namespace _016videoslow
                 return null;
             }
 
-            previousFrame = result;
+            Bitmap result = currentFrame;
+            // double buffering
+            // save the current bitmap to act as previous one when decoding the next frame
+            SwapBitmaps(ref previousFrame, ref currentFrame);
 
             return result;
+        }
+
+        private void SwapBitmaps(ref Bitmap previousFrame, ref Bitmap currentFrame)
+        {
+            Bitmap swapped = previousFrame;
+            previousFrame = currentFrame;
+            currentFrame = swapped;
         }
 
         #endregion
