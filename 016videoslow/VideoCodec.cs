@@ -7,6 +7,7 @@ using System.IO;
 using System.IO.Compression;
 using Support;
 using System.Runtime.Serialization;
+using System.Drawing.Imaging;
 
 namespace _016videoslow
 {
@@ -39,23 +40,24 @@ namespace _016videoslow
 
         #region Codec API
 
-        public Stream EncodeHeader(int width, int height, float fps, Stream outStream)
+        public Stream EncodeHeader(Stream outStream, int width, int height, float fps, PixelFormat pixelFormat)
         {
             if (outStream == null) return null;
 
             DeflateStream ds = new BufferedDeflateStream(16384, outStream, CompressionMode.Compress, true);
+            //Stream ds = outStream;
 
             frameWidth = width;
             frameHeight = height;
             framesPerSecond = fps;
-            previousFrame = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            previousFrame = new Bitmap(width, height, pixelFormat);
 
-            // video header: [ MAGIC, width, height, fps ]
+            // video header: [ MAGIC, width, height, fps, pixel format ]
             ds.WriteUInt(MAGIC);
             ds.WriteShort((short)width);
             ds.WriteShort((short)height);
-
             ds.WriteShort((short)(100.0f * fps));
+            ds.WriteUInt((uint)pixelFormat);
 
             return ds;
         }
@@ -72,17 +74,32 @@ namespace _016videoslow
             outStream.WriteUInt(MAGIC_FRAME);
             outStream.WriteShort((short)frameIndex);
 
-            for (int y = 0; y < frameHeight; y++)
+            BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
+            BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+            // TODO: find out the true number of bytes using the pixel format
+            int pixelBytes = 4;
+
+            unsafe
             {
-                for (int x = 0; x < frameWidth; x++)
+                for (int y = 0; y < frameHeight; y++)
                 {
-                    Color actualColor = inputFrame.GetPixel(x, y);
-                    Color predictedColor = previousFrame.GetPixel(x, y);
-                    outStream.WriteShort((short)(actualColor.R - predictedColor.R));
-                    outStream.WriteShort((short)(actualColor.G - predictedColor.G));
-                    outStream.WriteShort((short)(actualColor.B - predictedColor.B));
+                    byte* inputRow = (byte*)inputData.Scan0 + (y * inputData.Stride);
+                    byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
+                    for (int x = 0; x < frameWidth; x++)
+                    {
+                        // assume BGRA pixel format
+                        for (int band = 2; band >= 0; band--)
+                        {
+                            int index = x * pixelBytes + band;
+                            outStream.WriteShort((short)(inputRow[index] - previousRow[index]));
+                        }
+                    }
                 }
             }
+
+            inputFrame.UnlockBits(inputData);
+            previousFrame.UnlockBits(previousData);
 
             previousFrame = inputFrame;
         }
@@ -92,6 +109,9 @@ namespace _016videoslow
             if (inStream == null) return null;
 
             DeflateStream ds = new DeflateStream(inStream, CompressionMode.Decompress, true);
+            //Stream ds = inStream;
+
+            PixelFormat pixelFormat;
 
             try
             {
@@ -101,14 +121,15 @@ namespace _016videoslow
                 frameWidth = ds.ReadShort();
                 frameHeight = ds.ReadShort();
                 framesPerSecond = ds.ReadShort() * 0.01f;
+                pixelFormat = (PixelFormat)ds.ReadUInt();
             }
             catch (EndOfStreamException)
             {
                 return null;
             }
 
-            previousFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-            currentFrame = new Bitmap(frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            previousFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
+            currentFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
 
             return ds;
         }
@@ -125,20 +146,33 @@ namespace _016videoslow
                 int encodedFrameIndex = inStream.ReadShort();
                 if (encodedFrameIndex != frameIndex) return null;
 
-                short[] diff = new short[3];
-                for (int y = 0; y < frameHeight; y++)
+                BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
+                BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+                // TODO: find out the true number of bytes using the pixel format
+                int pixelBytes = 4;
+
+                unsafe
                 {
-                    for (int x = 0; x < frameWidth; x++)
+                    for (int y = 0; y < frameHeight; y++)
                     {
-                        for (int band = 0; band < diff.Length; band++)
+                        byte* currentRow = (byte*)currentData.Scan0 + (y * currentData.Stride);
+                        byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
+                        for (int x = 0; x < frameWidth; x++)
                         {
-                            diff[band] = inStream.ReadShort();
+                            // BGRA
+                            for (int band = 2; band >= 0; band--)
+                            {
+                                short diff = inStream.ReadShort();
+                                int index = x * pixelBytes + band;
+                                currentRow[index] = (byte)(previousRow[index] + diff);
+                            }
+                            currentRow[x * pixelBytes + 3] = 255; // assume full alpha
                         }
-                        Color predicted = previousFrame.GetPixel(x, y);
-                        Color actual = Color.FromArgb(predicted.R + diff[0], predicted.G + diff[1], predicted.B + diff[2]);
-                        currentFrame.SetPixel(x, y, actual);
                     }
                 }
+                currentFrame.UnlockBits(currentData);
+                previousFrame.UnlockBits(previousData);
             }
             catch (EndOfStreamException)
             {

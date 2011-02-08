@@ -99,7 +99,7 @@ namespace _016videoslow
             lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
 
             VideoCodec codec = new VideoCodec();
-            outStream = codec.EncodeHeader(frameImage.Width, frameImage.Height, (float)numericFps.Value, fs);
+            outStream = codec.EncodeHeader(fs, frameImage.Width, frameImage.Height, (float)numericFps.Value, frameImage.PixelFormat);
             lastWatchTime = LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
             do
