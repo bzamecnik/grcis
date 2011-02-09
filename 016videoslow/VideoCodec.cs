@@ -28,6 +28,10 @@ namespace _016videoslow
         protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
+        protected bool visualizeMCBlockTypes = true;
+        private Bitmap debugFrame = null;
+        private BitmapData debugFrameData = null;
+
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
         protected int[] mcPossibleOffsets = {
@@ -86,6 +90,7 @@ namespace _016videoslow
 
             BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
             BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+            
 
             int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
             if (frameIndex == 0)
@@ -284,6 +289,12 @@ namespace _016videoslow
                 BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
                 BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
 
+                if (visualizeMCBlockTypes)
+                {
+                    debugFrame = new Bitmap(frameWidth, frameHeight, currentData.PixelFormat);
+                    debugFrameData = debugFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+                }
+
                 int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
 
                 if (frameIndex == 0)
@@ -297,6 +308,12 @@ namespace _016videoslow
 
                 currentFrame.UnlockBits(currentData);
                 previousFrame.UnlockBits(previousData);
+
+                if (visualizeMCBlockTypes)
+                {
+                    debugFrame.UnlockBits(debugFrameData);
+                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex + 1), ImageFormat.Png);
+                }
             }
             catch (EndOfStreamException)
             {
@@ -361,14 +378,19 @@ namespace _016videoslow
             }
         }
 
-        unsafe private void DecodeFullBlock(Stream inStream, BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
+        unsafe private void DecodeFullBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
         {
-            byte* inputPtr = (byte*)inputData.Scan0;
+            byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
             for (int y = yStart; y < yStart + mcBlockSize; y++)
             {
-                byte* inputRow = inputPtr + (y * inputData.Stride);
+                byte* currentRow = currentPtr + (y * currentData.Stride);
                 byte* previousRow = previousPtr + (y * previousData.Stride);
+                byte* debugRow = (byte*)0;
+                if (visualizeMCBlockTypes)
+                {
+                    debugRow = (byte*)debugFrameData.Scan0 + (y * debugFrameData.Stride);
+                }
                 for (int x = xStart; x < xStart + mcBlockSize; x++)
                 {
                     // assume BGRA input pixel format, store as RGB
@@ -377,23 +399,36 @@ namespace _016videoslow
                         // temporal prediction
                         SByte diff = inStream.ReadSByte();
                         int index = x * pixelBytes + band;
-                        inputRow[index] = (byte)(previousRow[index] + diff);
+                        currentRow[index] = (byte)(previousRow[index] + diff);
+                    }
+
+                    if (visualizeMCBlockTypes)
+                    {
+                        int index = x * pixelBytes;
+                        debugRow[index] = 0;
+                        debugRow[index + 1] = 255;
+                        debugRow[index + 2] = 0;
                     }
                 }
             }
         }
 
-        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
+        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
         {
             int xOffset = inStream.ReadShort();
             int yOffset = inStream.ReadShort();
 
-            byte* inputPtr = (byte*)inputData.Scan0;
+            byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
             for (int y = yStart; y < yStart + mcBlockSize; y++)
             {
-                byte* inputRow = inputPtr + (y * inputData.Stride);
+                byte* inputRow = currentPtr + (y * currentData.Stride);
                 byte* previousRow = previousPtr + ((y + yOffset) * previousData.Stride);
+                byte* debugRow = (byte*)0;
+                if (visualizeMCBlockTypes)
+                {
+                    debugRow = (byte*)debugFrameData.Scan0 + (y * debugFrameData.Stride);
+                }
                 for (int x = xStart; x < xStart + mcBlockSize; x++)
                 {
                     // assume BGRA input pixel format, store as RGB
@@ -403,6 +438,13 @@ namespace _016videoslow
                         int inputIndex = x * pixelBytes + band;
                         int previousIndex = inputIndex + xOffset * pixelBytes;
                         inputRow[inputIndex] = previousRow[previousIndex];
+                    }
+                    if (visualizeMCBlockTypes)
+                    {
+                        int index = x * pixelBytes;
+                        debugRow[index] = 0;
+                        debugRow[index + 1] = 0;
+                        debugRow[index + 2] = 255;
                     }
                 }
             }
