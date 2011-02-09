@@ -34,13 +34,7 @@ namespace _016videoslow
 
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
-        protected int[] mcPossibleOffsets = {
-            0, 0,
-            0, -1,
-            1, 0,
-            0, 1,
-            -1, 0,
-        };
+        protected int[] mcPossibleOffsets;
 
         #endregion
 
@@ -48,6 +42,7 @@ namespace _016videoslow
 
         public VideoCodec()
         {
+            mcPossibleOffsets = PreparePossibleMotionVectors();
         }
 
         #endregion
@@ -469,6 +464,31 @@ namespace _016videoslow
         }
 
         #endregion
+
+        private int[] PreparePossibleMotionVectors()
+        {
+            List<int> vectors = new List<int>();
+            // origin
+            vectors.Add(0);
+            vectors.Add(0);
+            // vertical and horizontal translation
+            int maxDistance = 64;
+            for (int i = 0; i < maxDistance; i++)
+            {
+                vectors.Add(0);
+                vectors.Add(i);
+                vectors.Add(0);
+                vectors.Add(-i);
+            }
+            for (int i = 0; i < maxDistance; i++)
+            {
+                vectors.Add(i);
+                vectors.Add(0);
+                vectors.Add(-i);
+                vectors.Add(0);
+            }
+            return vectors.ToArray();
+        }
 
     }
 
