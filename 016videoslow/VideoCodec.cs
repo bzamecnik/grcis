@@ -6,179 +6,289 @@ using System.Text;
 using System.IO;
 using System.IO.Compression;
 using Support;
+using System.Runtime.Serialization;
+using System.Drawing.Imaging;
 
 namespace _016videoslow
 {
-  class VideoCodec
-  {
-    #region protected data
-
-    protected const uint MAGIC = 0xfe4c128a;
-
-    protected const uint MAGIC_FRAME = 0x1212fba1;
-
-    protected int frameWidth = 0;
-
-    protected int frameHeight = 0;
-
-    protected float framesPerSecond = 0.0f;
-
-    #endregion
-
-    #region constructor
-
-    public VideoCodec ()
+    class VideoCodec
     {
-    }
+        #region protected data
 
-    #endregion
+        protected const uint MAGIC = 0xfe4c128a;
 
-    #region Codec API
+        protected const uint MAGIC_FRAME = 0x1212fba1;
 
-    public Stream EncodeHeader ( int width, int height, float fps, Stream outs )
-    {
-      frameWidth      = width;
-      frameHeight     = height;
-      framesPerSecond = fps;
+        protected int frameWidth = 0;
 
-      if ( outs == null ) return null;
+        protected int frameHeight = 0;
 
-      DeflateStream ds = new BufferedDeflateStream( 16384, outs, CompressionMode.Compress, true );
+        protected float framesPerSecond = 0.0f;
 
-      // !!!{{ TODO: add the header construction/encoding here
+        protected Bitmap currentFrame = null;
+        protected Bitmap previousFrame = null;
 
-      // video header: [ MAGIC, width, height, fps ]
-      ds.WriteByte( (byte)((MAGIC >> 24) & 0xff) );
-      ds.WriteByte( (byte)((MAGIC >> 16) & 0xff) );
-      ds.WriteByte( (byte)((MAGIC >>  8) & 0xff) );
-      ds.WriteByte( (byte)(MAGIC         & 0xff) );
+        #endregion
 
-      ds.WriteByte( (byte)((width >> 8) & 0xff) );
-      ds.WriteByte( (byte)(width        & 0xff) );
+        #region constructor
 
-      ds.WriteByte( (byte)((height >> 8) & 0xff) );
-      ds.WriteByte( (byte)(height        & 0xff) );
-
-      int fpsInt = (int)(100.0f * fps);
-      ds.WriteByte( (byte)((fpsInt >> 8) & 0xff) );
-      ds.WriteByte( (byte)(fpsInt        & 0xff) );
-
-      // !!!}}
-
-      return ds;
-    }
-
-    public void EncodeFrame ( int frameNo, Bitmap inp, Stream outs )
-    {
-      if ( inp  == null ||
-           outs == null ) return;
-
-      int width  = inp.Width;
-      int height = inp.Height;
-      if ( width  != frameWidth ||
-           height != frameHeight ) return;
-
-      // !!!{{ TODO: add the encoding code here
-
-      // frame header: [ MAGIC_FRAME, frameNo ]
-      outs.WriteByte( (byte)((MAGIC_FRAME >> 24) & 0xff) );
-      outs.WriteByte( (byte)((MAGIC_FRAME >> 16) & 0xff) );
-      outs.WriteByte( (byte)((MAGIC_FRAME >>  8) & 0xff) );
-      outs.WriteByte( (byte)(MAGIC_FRAME         & 0xff) );
-
-      outs.WriteByte( (byte)((frameNo >> 8) & 0xff) );
-      outs.WriteByte( (byte)(frameNo        & 0xff) );
-
-      for ( int y = 0; y < frameHeight; y++ )
-        for ( int x = 0; x < frameWidth; x++ )
+        public VideoCodec()
         {
-          byte gr = (byte)(inp.GetPixel( x, y ).GetBrightness() * 255.0f);
-          outs.WriteByte( gr );
         }
 
-      // !!!}}
-    }
+        #endregion
 
-    public Stream DecodeHeader ( Stream inps )
-    {
-      if ( inps == null ) return null;
+        #region Codec API
 
-      DeflateStream ds = new DeflateStream( inps, CompressionMode.Decompress, true );
-
-      // !!!{{ TODO: add the header decoding here
-
-      // Check the global header:
-      int buffer;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC >> 24) & 0xff) ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC >> 16) & 0xff) ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC >>  8) & 0xff) ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 || buffer != (MAGIC         & 0xff) ) return null;
-
-      frameWidth = ds.ReadByte();
-      if ( frameWidth < 0 ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 ) return null;
-      frameWidth = (frameWidth << 8) + buffer;
-      frameHeight = ds.ReadByte();
-      if ( frameHeight < 0 ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 ) return null;
-      frameHeight = (frameHeight << 8) + buffer;
-
-      int fpsInt = ds.ReadByte();
-      if ( fpsInt < 0 ) return null;
-      buffer = ds.ReadByte();
-      if ( buffer < 0 ) return null;
-      framesPerSecond = ((fpsInt << 8) + buffer) * 0.01f;
-
-      // !!!}}
-
-      return ds;
-    }
-
-    public Bitmap DecodeFrame ( int frameNo, Stream inps )
-    {
-      if ( inps == null ) return null;
-
-      // !!!{{ TODO: add the decoding code here
-
-      // Check the frame header:
-      int buffer;
-      buffer = inps.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC_FRAME >> 24) & 0xff) ) return null;
-      buffer = inps.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC_FRAME >> 16) & 0xff) ) return null;
-      buffer = inps.ReadByte();
-      if ( buffer < 0 || buffer != ((MAGIC_FRAME >>  8) & 0xff) ) return null;
-      buffer = inps.ReadByte();
-      if ( buffer < 0 || buffer != (MAGIC_FRAME         & 0xff) ) return null;
-
-      int frNo = inps.ReadByte();
-      if ( frNo < 0 ) return null;
-      buffer = inps.ReadByte();
-      if ( buffer < 0 ) return null;
-      if ( ((frNo << 8) + buffer) != frameNo ) return null;
-
-      Bitmap result = new Bitmap( frameWidth, frameHeight, System.Drawing.Imaging.PixelFormat.Format24bppRgb );
-
-      for ( int y = 0; y < frameHeight; y++ )
-        for ( int x = 0; x < frameWidth; x++ )
+        public Stream EncodeHeader(Stream outStream, int width, int height, float fps, PixelFormat pixelFormat)
         {
-          int gr = inps.ReadByte();
-          result.SetPixel( x, y, Color.FromArgb( gr, gr, gr ) );
+            if (outStream == null) return null;
+
+            DeflateStream ds = new BufferedDeflateStream(16384, outStream, CompressionMode.Compress, true);
+            //Stream ds = outStream;
+
+            frameWidth = width;
+            frameHeight = height;
+            framesPerSecond = fps;
+            previousFrame = new Bitmap(width, height, pixelFormat);
+
+            // video header: [ MAGIC, width, height, fps, pixel format ]
+            ds.WriteUInt(MAGIC);
+            ds.WriteShort((short)width);
+            ds.WriteShort((short)height);
+            ds.WriteShort((short)(100.0f * fps));
+            ds.WriteUInt((uint)pixelFormat);
+
+            return ds;
         }
 
-      return result;
+        public void EncodeFrame(int frameIndex, Bitmap inputFrame, Stream outStream)
+        {
+            if ((inputFrame == null) || (outStream == null)) return;
 
-      // !!!}}
+            int width = inputFrame.Width;
+            int height = inputFrame.Height;
+            if ((width != frameWidth) || (height != frameHeight)) return;
+
+            // frame header: [ MAGIC_FRAME, frameIndex ]
+            outStream.WriteUInt(MAGIC_FRAME);
+            outStream.WriteShort((short)frameIndex);
+
+            BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
+            BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+            int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
+
+            unsafe
+            {
+                for (int y = 0; y < frameHeight; y++)
+                {
+                    byte* inputRow = (byte*)inputData.Scan0 + (y * inputData.Stride);
+                    byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
+                    for (int x = 0; x < frameWidth; x++)
+                    {
+                        // assume BGRA pixel format
+                        for (int band = 2; band >= 0; band--)
+                        {
+                            int index = x * pixelBytes + band;
+                            outStream.WriteShort((short)(inputRow[index] - previousRow[index]));
+                        }
+                    }
+                }
+            }
+
+            inputFrame.UnlockBits(inputData);
+            previousFrame.UnlockBits(previousData);
+
+            previousFrame = inputFrame;
+        }
+
+        public Stream DecodeHeader(Stream inStream)
+        {
+            if (inStream == null) return null;
+
+            DeflateStream ds = new DeflateStream(inStream, CompressionMode.Decompress, true);
+            //Stream ds = inStream;
+
+            PixelFormat pixelFormat;
+
+            try
+            {
+                // Check the global header:
+                if (ds.ReadUInt() != MAGIC) return null;
+
+                frameWidth = ds.ReadShort();
+                frameHeight = ds.ReadShort();
+                framesPerSecond = ds.ReadShort() * 0.01f;
+                pixelFormat = (PixelFormat)ds.ReadUInt();
+            }
+            catch (EndOfStreamException)
+            {
+                return null;
+            }
+
+            previousFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
+            currentFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
+
+            return ds;
+        }
+
+        public Bitmap DecodeFrame(int frameIndex, Stream inStream)
+        {
+            if (inStream == null) return null;
+
+            try
+            {
+                // Check the frame header:
+                if (inStream.ReadUInt() != MAGIC_FRAME) return null;
+
+                int encodedFrameIndex = inStream.ReadShort();
+                if (encodedFrameIndex != frameIndex) return null;
+
+                BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
+                BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+                int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
+
+                unsafe
+                {
+                    for (int y = 0; y < frameHeight; y++)
+                    {
+                        byte* currentRow = (byte*)currentData.Scan0 + (y * currentData.Stride);
+                        byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
+                        for (int x = 0; x < frameWidth; x++)
+                        {
+                            // BGRA
+                            for (int band = 2; band >= 0; band--)
+                            {
+                                short diff = inStream.ReadShort();
+                                int index = x * pixelBytes + band;
+                                currentRow[index] = (byte)(previousRow[index] + diff);
+                            }
+                            if (pixelBytes == 4)
+                            {
+                                currentRow[x * pixelBytes + 3] = 255; // assume full alpha
+                            }
+                        }
+                    }
+                }
+                currentFrame.UnlockBits(currentData);
+                previousFrame.UnlockBits(previousData);
+            }
+            catch (EndOfStreamException)
+            {
+                return null;
+            }
+
+            Bitmap result = currentFrame;
+            // double buffering
+            // save the current bitmap to act as previous one when decoding the next frame
+            SwapBitmaps(ref previousFrame, ref currentFrame);
+
+            return result;
+        }
+
+        private void SwapBitmaps(ref Bitmap previousFrame, ref Bitmap currentFrame)
+        {
+            Bitmap swapped = previousFrame;
+            previousFrame = currentFrame;
+            currentFrame = swapped;
+        }
+
+        private int GetBytesPerPixel(PixelFormat pixelFormat)
+        {
+            switch (pixelFormat)
+            {
+                case PixelFormat.Format24bppRgb: return 3;
+                case PixelFormat.Format32bppArgb: return 4;
+                default:
+                    throw new ArgumentException("Unsupported pixel format");
+            }
+        }
+
+        #endregion
+
     }
 
-    #endregion
+    public class EndOfStreamException : System.Exception, ISerializable
+    {
+        public EndOfStreamException()
+        {   
+        }
 
-  }
+        public EndOfStreamException(string message)
+            : base(message)
+        {            
+        }
+
+        public EndOfStreamException(string message, Exception inner)
+            :  base(message, inner)
+        {           
+        }
+
+        // This constructor is needed for serialization.
+        protected EndOfStreamException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    public static class Extensions
+    {
+        public static void WriteShort(this Stream outs, short number)
+        {
+            outs.WriteByte((byte)((number >> 8) & 0xff));
+            outs.WriteByte((byte)(number & 0xff));
+        }
+
+        public static void WriteUInt(this Stream outs, uint number)
+        {
+            outs.WriteByte((byte)((number >> 24) & 0xff));
+            outs.WriteByte((byte)((number >> 16) & 0xff));
+            outs.WriteByte((byte)((number >> 8) & 0xff));
+            outs.WriteByte((byte)(number & 0xff));
+        }
+
+        public static byte ReadByte(this Stream inputStream)
+        {
+            int number = inputStream.ReadByte();
+            if (number < 0) throw new EndOfStreamException();
+            return (byte)number;
+        }
+
+        public static short ReadShort(this Stream inputStream)
+        {
+            int number = 0;
+            for (int i = 0; i < 2; i++)
+            {
+                int buffer = inputStream.ReadByte();
+                if (buffer < 0) throw new EndOfStreamException();
+                number = (number << 8) + buffer;
+            }
+            return (short) number;
+        }
+
+        public static uint ReadUInt(this Stream inputStream)
+        {
+            uint number = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                int buffer = inputStream.ReadByte();
+                if (buffer < 0) throw new EndOfStreamException();
+                number = (uint)((number << 8) + buffer);
+            }
+            return number;
+        }
+
+        public static Color plus(this Color color, Color another)
+        {
+            return Color.FromArgb(color.R + another.R, color.G + another.G, color.B + another.B);
+        }
+
+        public static Color minus(this Color color, Color another)
+        {
+            return Color.FromArgb(color.R - another.R, color.G - another.G, color.B - another.B);
+        }
+    }
 
 }
