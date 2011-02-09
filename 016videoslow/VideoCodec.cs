@@ -91,7 +91,8 @@ namespace _016videoslow
                         for (int band = 2; band >= 0; band--)
                         {
                             int index = x * pixelBytes + band;
-                            outStream.WriteShort((short)(inputRow[index] - previousRow[index]));
+                            SByte diff = (SByte)(inputRow[index] - previousRow[index]);
+                            outStream.WriteSByte(diff);
                         }
                     }
                 }
@@ -161,7 +162,7 @@ namespace _016videoslow
                             // BGRA
                             for (int band = 2; band >= 0; band--)
                             {
-                                short diff = inStream.ReadShort();
+                                SByte diff = inStream.ReadSByte();
                                 int index = x * pixelBytes + band;
                                 currentRow[index] = (byte)(previousRow[index] + diff);
                             }
@@ -241,6 +242,15 @@ namespace _016videoslow
             outs.WriteByte((byte)(number & 0xff));
         }
 
+        // [-255;255]
+        public static void WriteSByte(this Stream outs, SByte number)
+        {
+            // sign:
+            // 255 = minus, 0 = zero, 1 = plus
+            outs.WriteByte((byte)(Math.Sign(number) & 0xff));
+            outs.WriteByte((byte)(Math.Abs((int)number) & 0xff));
+        }
+
         public static void WriteUInt(this Stream outs, uint number)
         {
             outs.WriteByte((byte)((number >> 24) & 0xff));
@@ -254,6 +264,15 @@ namespace _016videoslow
             int number = inputStream.ReadByte();
             if (number < 0) throw new EndOfStreamException();
             return (byte)number;
+        }
+
+        public static SByte ReadSByte(this Stream inputStream)
+        {
+            int sign = inputStream.ReadByte();
+            if (sign < 0) throw new EndOfStreamException();
+            int number = inputStream.ReadByte();
+            if (number < 0) throw new EndOfStreamException();
+            return (SByte)(((SByte)sign) * ((byte)number));
         }
 
         public static short ReadShort(this Stream inputStream)
