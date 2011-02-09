@@ -213,17 +213,17 @@ namespace _016videoslow
     public class EndOfStreamException : System.Exception, ISerializable
     {
         public EndOfStreamException()
-        {   
+        {
         }
 
         public EndOfStreamException(string message)
             : base(message)
-        {            
+        {
         }
 
         public EndOfStreamException(string message, Exception inner)
-            :  base(message, inner)
-        {           
+            : base(message, inner)
+        {
         }
 
         // This constructor is needed for serialization.
@@ -265,7 +265,7 @@ namespace _016videoslow
                 if (buffer < 0) throw new EndOfStreamException();
                 number = (number << 8) + buffer;
             }
-            return (short) number;
+            return (short)number;
         }
 
         public static uint ReadUInt(this Stream inputStream)
