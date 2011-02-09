@@ -77,8 +77,7 @@ namespace _016videoslow
             BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
             BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
 
-            // TODO: find out the true number of bytes using the pixel format
-            int pixelBytes = 4;
+            int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
 
             unsafe
             {
@@ -149,8 +148,7 @@ namespace _016videoslow
                 BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
                 BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
 
-                // TODO: find out the true number of bytes using the pixel format
-                int pixelBytes = 4;
+                int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
 
                 unsafe
                 {
@@ -167,7 +165,10 @@ namespace _016videoslow
                                 int index = x * pixelBytes + band;
                                 currentRow[index] = (byte)(previousRow[index] + diff);
                             }
-                            currentRow[x * pixelBytes + 3] = 255; // assume full alpha
+                            if (pixelBytes == 4)
+                            {
+                                currentRow[x * pixelBytes + 3] = 255; // assume full alpha
+                            }
                         }
                     }
                 }
@@ -192,6 +193,17 @@ namespace _016videoslow
             Bitmap swapped = previousFrame;
             previousFrame = currentFrame;
             currentFrame = swapped;
+        }
+
+        private int GetBytesPerPixel(PixelFormat pixelFormat)
+        {
+            switch (pixelFormat)
+            {
+                case PixelFormat.Format24bppRgb: return 3;
+                case PixelFormat.Format32bppArgb: return 4;
+                default:
+                    throw new ArgumentException("Unsupported pixel format");
+            }
         }
 
         #endregion
