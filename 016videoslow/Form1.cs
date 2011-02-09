@@ -78,15 +78,21 @@ namespace _016videoslow
             sfd.FileName = videoFileName;
             if (sfd.ShowDialog() != DialogResult.OK)
                 return;
+            videoFileName = sfd.FileName;
 
-            FileStream fs = new FileStream(videoFileName = sfd.FileName, FileMode.Create);
-            Stream outStream;
+            encodingBackgroundWorker.RunWorkerAsync();
+        }
 
+        private void encodingBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
             string imageFileName = String.Format(textInputMask.Text, 0);
             if (!File.Exists(imageFileName))
             {
                 return;
             }
+
+            FileStream fs = new FileStream(videoFileName, FileMode.Create);
+            Stream outStream;
 
             StreamWriter log = new StreamWriter(new FileStream("encodelog.txt", FileMode.Create));
             log.WriteLine("Encoding an image sequence into a compressed video file: " + videoFileName);
@@ -107,10 +113,15 @@ namespace _016videoslow
                 codec.EncodeFrame(frameIndex, frameImage, outStream);
                 lastWatchTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
 
-                imageFileName = String.Format(textInputMask.Text, ++frameIndex);
+                imageFileName = String.Format(textInputMask.Text, frameIndex + 1);
                 if (!File.Exists(imageFileName)) break;
                 frameImage = (Bitmap)Image.FromFile(imageFileName);
                 lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                BeginInvoke((Action)delegate
+                {
+                    codingStatusLabel.Text = String.Format("Encoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
+                });
+                frameIndex++;
             } while (true);
 
             outStream.Close();
@@ -129,12 +140,17 @@ namespace _016videoslow
 
         private void buttonDecode_Click(object sender, EventArgs e)
         {
+            decodingBackgroundWorker.RunWorkerAsync();
+        }
+
+        private void decodingBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
             string imageFileName = String.Format(textOutputMask.Text, 0);
             string dir = Path.GetDirectoryName(imageFileName);
             Directory.CreateDirectory(dir);
 
             FileStream fs = new FileStream(videoFileName, FileMode.Open);
-            
+
             if (fs == null)
             {
                 return;
@@ -156,9 +172,14 @@ namespace _016videoslow
                 frameImage = codec.DecodeFrame(frameIndex, inStream);
                 if (frameImage == null) break;
                 lastWatchTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
-                imageFileName = String.Format(textOutputMask.Text, frameIndex++);
+                imageFileName = String.Format(textOutputMask.Text, frameIndex + 1);
                 frameImage.Save(imageFileName, ImageFormat.Png);
                 lastWatchTime = LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                BeginInvoke((Action)delegate
+                {
+                    codingStatusLabel.Text = String.Format("Decoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
+                });
+                frameIndex++;
             }
             while (true);
 
