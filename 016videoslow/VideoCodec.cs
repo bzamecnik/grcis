@@ -462,6 +462,10 @@ namespace _016videoslow
                         int index = x * pixelBytes + band;
                         currentRow[index] = (byte)(previousRow[index] + diff);
                     }
+                    if (pixelBytes == 4)
+                    {
+                        currentRow[x * pixelBytes + 3] = 255; // assume full alpha 
+                    }
 
                     if (visualizeMCBlockTypes)
                     {
