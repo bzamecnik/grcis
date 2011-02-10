@@ -46,6 +46,8 @@ namespace _016videoslow
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
         protected MotionVector[] mcPossibleOffsets;
+        protected LinkedList<MotionVector> favouriteMotionVectors;
+        protected const int MAX_FAVOURITE_MOTION_VECTORS_SIZE = 3;
 
         StreamWriter log;
 
@@ -56,6 +58,7 @@ namespace _016videoslow
         public VideoCodec(StreamWriter log)
         {
             mcPossibleOffsets = PreparePossibleMotionVectors();
+            favouriteMotionVectors = new LinkedList<MotionVector>();
             this.log = log;
         }
 
@@ -296,6 +299,22 @@ namespace _016videoslow
             byte* inputPtr = (byte*)inputData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
 
+            motionVector = MotionVector.ZERO;
+            // Origin - no translation. This is most probable.
+            if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, MotionVector.ZERO))
+            {
+                return true;
+            }
+
+            foreach (MotionVector favouriteVector in favouriteMotionVectors)
+            {
+                if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, favouriteVector))
+                {
+                    motionVector = favouriteVector;
+                    return true;
+                }
+            }
+
             // check possible offsets to find an equal shifted
             // block in the previous frame
             for (int i = 0; i < mcPossibleOffsets.Length; i++)
@@ -303,10 +322,17 @@ namespace _016videoslow
                 motionVector = mcPossibleOffsets[i];
                 if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, motionVector))
                 {
+                    if (!favouriteMotionVectors.Contains(motionVector))
+                    {
+                        favouriteMotionVectors.AddFirst(motionVector);
+                        if (favouriteMotionVectors.Count > MAX_FAVOURITE_MOTION_VECTORS_SIZE)
+                        {
+                            favouriteMotionVectors.RemoveLast();
+                        }
+                    }
                     return true;
                 }
             }
-            motionVector = MotionVector.ZERO;
             return false;
         }
 
@@ -547,9 +573,6 @@ namespace _016videoslow
         private MotionVector[] PreparePossibleMotionVectors()
         {
             List<MotionVector> vectors = new List<MotionVector>();
-            // Origin - no translation.
-            // This is most probable.
-            vectors.Add(MotionVector.ZERO);
             // Add offsets for vertical and horizontal translation.
             // This is very probable.
             int maxDistance = 64;
@@ -566,7 +589,7 @@ namespace _016videoslow
             // Add offsets for exhaustive search in remaining positions
             // within a defined square (possible smaller than the V and H directions).
             // This is less probable.
-            int squareSize = 16;
+            int squareSize = 32;
             for (short i = 1; i < squareSize; i++)
             {
                 for (short j = 1; j < squareSize; j++)
