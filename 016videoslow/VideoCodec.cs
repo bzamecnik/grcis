@@ -38,7 +38,7 @@ namespace _016videoslow
 
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
-        protected int[] mcPossibleOffsets;
+        protected short[] mcPossibleOffsets;
 
         StreamWriter log;
 
@@ -253,8 +253,8 @@ namespace _016videoslow
 
                     if (motionVectorFound)
                     {
-                        int xOffset = mcPossibleOffsets[motionVectorOffset];
-                        int yOffset = mcPossibleOffsets[motionVectorOffset + 1];
+                        short xOffset = mcPossibleOffsets[motionVectorOffset];
+                        short yOffset = mcPossibleOffsets[motionVectorOffset + 1];
                         if ((xOffset == 0) && (yOffset == 0))
                         {
                             outStream.WriteByte((byte)MCRecordType.Identical);
@@ -268,8 +268,8 @@ namespace _016videoslow
                             // TODO: store only a difference to the previous motion vector
                             // TODO: it could be possible to store only an index to the vector of
                             // possible motion vectors
-                            outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset]);
-                            outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset + 1]);
+                            outStream.WriteSShort(xOffset);
+                            outStream.WriteSShort(yOffset);
                             translatedBlocksCount++;
                         }
                     }
@@ -529,9 +529,9 @@ namespace _016videoslow
             }
         }
 
-        private int[] PreparePossibleMotionVectors()
+        private short[] PreparePossibleMotionVectors()
         {
-            List<int> vectors = new List<int>();
+            List<short> vectors = new List<short>();
             // Origin - no translation.
             // This is most probable.
             vectors.Add(0);
@@ -539,38 +539,38 @@ namespace _016videoslow
             // Add offsets for vertical and horizontal translation.
             // This is very probable.
             int maxDistance = 64;
-            for (int i = 1; i < maxDistance; i++)
+            for (short i = 1; i < maxDistance; i++)
             {
                 vectors.Add(0);
                 vectors.Add(i);
                 vectors.Add(0);
-                vectors.Add(-i);
+                vectors.Add((short)-i);
             }
-            for (int i = 1; i < maxDistance; i++)
+            for (short i = 1; i < maxDistance; i++)
             {
                 vectors.Add(i);
                 vectors.Add(0);
-                vectors.Add(-i);
+                vectors.Add((short)-i);
                 vectors.Add(0);
             }
             // Add offsets for exhaustive search in remaining positions
             // within a defined square (possible smaller than the V and H directions).
             // This is less probable.
             int squareSize = 8;
-            for (int i = 1; i < squareSize; i++)
+            for (short i = 1; i < squareSize; i++)
             {
                 // right down quadrant
                 vectors.Add(i);
                 vectors.Add(i);
                 // right up quadrant
                 vectors.Add(i);
-                vectors.Add(-i);
+                vectors.Add((short)-i);
                 // left up quadrant
-                vectors.Add(-i);
+                vectors.Add((short)-i);
                 vectors.Add(i);
                 // left down quadrant
-                vectors.Add(-i);
-                vectors.Add(-i);
+                vectors.Add((short)-i);
+                vectors.Add((short)-i);
             }
             return vectors.ToArray();
         }
