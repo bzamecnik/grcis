@@ -36,7 +36,8 @@ namespace _016videoslow
         protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
-        protected bool visualizeMCBlockTypes = true;
+        // TODO: make a checkbox for this
+        protected bool visualizeMCBlockTypes = false;
         protected Bitmap debugFrame = null;
         protected BitmapData debugFrameData = null;
 
@@ -253,13 +254,12 @@ namespace _016videoslow
                     int yStart = yBlock * mcBlockSize;
                     int xStart = xBlock * mcBlockSize;
 
-                    int motionVectorOffset;
+                    MotionVector motionVector;
                     bool motionVectorFound = SearchMotionVector(inputData,
-                        previousData, pixelBytes, yStart, xStart, out motionVectorOffset);
+                        previousData, pixelBytes, yStart, xStart, out motionVector);
 
                     if (motionVectorFound)
                     {
-                        MotionVector motionVector = mcPossibleOffsets[motionVectorOffset];
                         if ((motionVector.x == 0) && (motionVector.y == 0))
                         {
                             outStream.WriteByte((byte)MCRecordType.Identical);
@@ -291,54 +291,56 @@ namespace _016videoslow
             Log("Block counts - identical: {0}, translated: {1}, full: {2}", identicalBlocksCount, translatedBlocksCount, fullBlocksCount);
         }
 
-        unsafe private bool SearchMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, out int motionVectorOffset)
+        unsafe private bool SearchMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, out MotionVector motionVector)
         {
             byte* inputPtr = (byte*)inputData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
 
-            bool motionVectorFound = false;
-            motionVectorOffset = 0;
-
             // check possible offsets to find an equal shifted
             // block in the previous frame
-            for (int i = 0; !motionVectorFound && (i < mcPossibleOffsets.Length); i++)
+            for (int i = 0; i < mcPossibleOffsets.Length; i++)
             {
-                bool isValidOffset = true;
-                for (int y = yStart; isValidOffset && (y < yStart + mcBlockSize); y++)
+                motionVector = mcPossibleOffsets[i];
+                if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, motionVector))
                 {
-                    byte* inputRow = inputPtr + (y * inputData.Stride);
-                    byte* previousRow = previousPtr + (y * previousData.Stride);
-                    for (int x = xStart; isValidOffset && (x < xStart + mcBlockSize); x++)
+                    return true;
+                }
+            }
+            motionVector = MotionVector.ZERO;
+            return false;
+        }
+
+        unsafe private bool TestMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, byte* inputPtr, byte* previousPtr, MotionVector motionVector)
+        {
+            for (int y = yStart; y < yStart + mcBlockSize; y++)
+            {
+                byte* inputRow = inputPtr + (y * inputData.Stride);
+                byte* previousRow = previousPtr + (y * previousData.Stride);
+                for (int x = xStart; x < xStart + mcBlockSize; x++)
+                {
+                    int xSource = x + motionVector.x;
+                    int ySource = y + motionVector.y;
+                    if ((x < 0) || (x >= frameWidth) ||
+                        (y < 0) || (y >= frameHeight) ||
+                        (xSource < 0) || (xSource >= frameWidth) ||
+                        (ySource < 0) || (ySource >= frameHeight))
                     {
-                        MotionVector motionVector = mcPossibleOffsets[i];
-                        int xSource = x + motionVector.x;
-                        int ySource = y + motionVector.y;
-                        if ((x < 0) || (x >= frameWidth) ||
-                            (y < 0) || (y >= frameHeight) ||
-                            (xSource < 0) || (xSource >= frameWidth) ||
-                            (ySource < 0) || (ySource >= frameHeight))
+                        return false;
+                    }
+                    // assume BGRA pixel format
+                    for (int band = 0; band < 3; band++)
+                    {
+                        int inputIndex = x * pixelBytes + band;
+                        int previousIndex = motionVector.y * previousData.Stride + xSource * pixelBytes + band;
+                        if (inputRow[inputIndex] != previousRow[previousIndex])
                         {
-                            isValidOffset = false;
-                            break;
-                        }
-                        // assume BGRA pixel format
-                        for (int band = 0; band < 3; band++)
-                        {
-                            int inputIndex = x * pixelBytes + band;
-                            int previousIndex = motionVector.y * previousData.Stride + xSource * pixelBytes + band;
-                            if (inputRow[inputIndex] != previousRow[previousIndex])
-                            {
-                                // means: inputFrame[x, y] != previousFrame[xSource, ySource])
-                                isValidOffset = false;
-                                break;
-                            }
+                            // means: inputFrame[x, y] != previousFrame[xSource, ySource])
+                            return false;
                         }
                     }
                 }
-                motionVectorFound = isValidOffset;
-                motionVectorOffset = i;
             }
-            return motionVectorFound;
+            return true;
         }
 
         unsafe private void EncodeFullBlock(Stream outStream, BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
