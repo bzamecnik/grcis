@@ -15,6 +15,8 @@ namespace _016videoslow
     {
         #region protected data
 
+        protected const uint DEFLATE_BUFFER_SIZE = 16384;
+
         protected const uint MAGIC = 0xfe4c128a;
 
         protected const uint MAGIC_FRAME = 0x1212fba1;
@@ -29,8 +31,10 @@ namespace _016videoslow
         protected Bitmap previousFrame = null;
 
         protected bool visualizeMCBlockTypes = true;
-        private Bitmap debugFrame = null;
-        private BitmapData debugFrameData = null;
+        protected Bitmap debugFrame = null;
+        protected BitmapData debugFrameData = null;
+
+        protected bool useDeflateCompression = true;
 
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
@@ -53,8 +57,10 @@ namespace _016videoslow
         {
             if (outStream == null) return null;
 
-            DeflateStream ds = new BufferedDeflateStream(16384, outStream, CompressionMode.Compress, true);
-            //Stream ds = outStream;
+            Stream ds = (useDeflateCompression)
+                ? new BufferedDeflateStream((int)DEFLATE_BUFFER_SIZE, outStream,
+                    CompressionMode.Compress, true)
+                : outStream;
 
             frameWidth = width;
             frameHeight = height;
@@ -63,9 +69,9 @@ namespace _016videoslow
 
             // video header: [ MAGIC, width, height, fps, pixel format ]
             ds.WriteUInt(MAGIC);
-            ds.WriteShort((short)width);
-            ds.WriteShort((short)height);
-            ds.WriteShort((short)(100.0f * fps));
+            ds.WriteSShort((short)width);
+            ds.WriteSShort((short)height);
+            ds.WriteSShort((short)(100.0f * fps));
             ds.WriteUInt((uint)pixelFormat);
 
             return ds;
@@ -81,11 +87,15 @@ namespace _016videoslow
 
             // frame header: [ MAGIC_FRAME, frameIndex ]
             outStream.WriteUInt(MAGIC_FRAME);
-            outStream.WriteShort((short)frameIndex);
+            outStream.WriteSShort((short)frameIndex);
 
-            BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
-            BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
-            
+            BitmapData inputData = inputFrame.LockBits(
+                new Rectangle(0, 0, width, height),
+                ImageLockMode.ReadOnly, inputFrame.PixelFormat);
+            BitmapData previousData = previousFrame.LockBits(
+                new Rectangle(0, 0, width, height),
+                ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
 
             int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
             if (frameIndex == 0)
@@ -102,6 +112,99 @@ namespace _016videoslow
 
             previousFrame = inputFrame;
         }
+
+        public Stream DecodeHeader(Stream inStream)
+        {
+            if (inStream == null) return null;
+
+            Stream ds = (useDeflateCompression)
+                ? new DeflateStream(inStream, CompressionMode.Decompress, true)
+                : inStream;
+
+            PixelFormat pixelFormat;
+
+            try
+            {
+                // Check the global header:
+                if (ds.ReadUInt() != MAGIC) return null;
+
+                frameWidth = ds.ReadSShort();
+                frameHeight = ds.ReadSShort();
+                framesPerSecond = ds.ReadSShort() * 0.01f;
+                pixelFormat = (PixelFormat)ds.ReadUInt();
+            }
+            catch (EndOfStreamException)
+            {
+                return null;
+            }
+
+            previousFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
+            currentFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
+
+            return ds;
+        }
+
+        public Bitmap DecodeFrame(int frameIndex, Stream inStream)
+        {
+            if (inStream == null) return null;
+
+            try
+            {
+                // Check the frame header:
+                if (inStream.ReadUInt() != MAGIC_FRAME) return null;
+
+                int encodedFrameIndex = inStream.ReadSShort();
+                if (encodedFrameIndex != frameIndex) return null;
+
+                BitmapData currentData = currentFrame.LockBits(
+                    new Rectangle(0, 0, frameWidth, frameHeight),
+                    ImageLockMode.ReadOnly, currentFrame.PixelFormat);
+                BitmapData previousData = previousFrame.LockBits(
+                    new Rectangle(0, 0, frameWidth, frameHeight),
+                    ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+                if (visualizeMCBlockTypes)
+                {
+                    debugFrame = new Bitmap(frameWidth, frameHeight, currentData.PixelFormat);
+                    debugFrameData = debugFrame.LockBits(
+                        new Rectangle(0, 0, frameWidth, frameHeight),
+                        ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+                }
+
+                int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
+
+                if (frameIndex == 0)
+                {
+                    DecodeIntraFrame(inStream, currentData, pixelBytes);
+                }
+                else
+                {
+                    DecodePredictedFrame(inStream, currentData, previousData, pixelBytes);
+                }
+
+                currentFrame.UnlockBits(currentData);
+                previousFrame.UnlockBits(previousData);
+
+                if (visualizeMCBlockTypes)
+                {
+                    debugFrame.UnlockBits(debugFrameData);
+                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex + 1), ImageFormat.Png);
+                }
+            }
+            catch (EndOfStreamException)
+            {
+                return null;
+            }
+
+            Bitmap result = currentFrame;
+            // double buffering
+            // save the current bitmap to act as previous one when decoding the next frame
+            SwapBitmaps(ref previousFrame, ref currentFrame);
+
+            return result;
+        }
+
+        #endregion
 
         private void EncodeIntraFrame(Stream outStream, BitmapData inputData, int pixelBytes)
         {
@@ -138,7 +241,8 @@ namespace _016videoslow
                     int xStart = xBlock * mcBlockSize;
 
                     int motionVectorOffset;
-                    bool motionVectorFound = SearchMotionVector(inputData, previousData, pixelBytes, yStart, xStart, out motionVectorOffset);
+                    bool motionVectorFound = SearchMotionVector(inputData,
+                        previousData, pixelBytes, yStart, xStart, out motionVectorOffset);
 
                     if (motionVectorFound)
                     {
@@ -148,8 +252,8 @@ namespace _016videoslow
                         // TODO: store only a difference to the previous motion vector
                         // TODO: it could be possible to store only an index to the vector of
                         // possible motion vectors
-                        outStream.WriteShort((short)mcPossibleOffsets[motionVectorOffset]);
-                        outStream.WriteShort((short)mcPossibleOffsets[motionVectorOffset + 1]);
+                        outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset]);
+                        outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset + 1]);
                     }
                     else
                     {
@@ -239,90 +343,6 @@ namespace _016videoslow
             return (numerator / denominator) + ((numerator % denominator > 0) ? 1 : 0);
         }
 
-        public Stream DecodeHeader(Stream inStream)
-        {
-            if (inStream == null) return null;
-
-            DeflateStream ds = new DeflateStream(inStream, CompressionMode.Decompress, true);
-            //Stream ds = inStream;
-
-            PixelFormat pixelFormat;
-
-            try
-            {
-                // Check the global header:
-                if (ds.ReadUInt() != MAGIC) return null;
-
-                frameWidth = ds.ReadShort();
-                frameHeight = ds.ReadShort();
-                framesPerSecond = ds.ReadShort() * 0.01f;
-                pixelFormat = (PixelFormat)ds.ReadUInt();
-            }
-            catch (EndOfStreamException)
-            {
-                return null;
-            }
-
-            previousFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
-            currentFrame = new Bitmap(frameWidth, frameHeight, pixelFormat);
-
-            return ds;
-        }
-
-        public Bitmap DecodeFrame(int frameIndex, Stream inStream)
-        {
-            if (inStream == null) return null;
-
-            try
-            {
-                // Check the frame header:
-                if (inStream.ReadUInt() != MAGIC_FRAME) return null;
-
-                int encodedFrameIndex = inStream.ReadShort();
-                if (encodedFrameIndex != frameIndex) return null;
-
-                BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
-                BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
-
-                if (visualizeMCBlockTypes)
-                {
-                    debugFrame = new Bitmap(frameWidth, frameHeight, currentData.PixelFormat);
-                    debugFrameData = debugFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
-                }
-
-                int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
-
-                if (frameIndex == 0)
-                {
-                    DecodeIntraFrame(inStream, currentData, pixelBytes);
-                }
-                else
-                {
-                    DecodePredictedFrame(inStream, currentData, previousData, pixelBytes);
-                }
-
-                currentFrame.UnlockBits(currentData);
-                previousFrame.UnlockBits(previousData);
-
-                if (visualizeMCBlockTypes)
-                {
-                    debugFrame.UnlockBits(debugFrameData);
-                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex + 1), ImageFormat.Png);
-                }
-            }
-            catch (EndOfStreamException)
-            {
-                return null;
-            }
-
-            Bitmap result = currentFrame;
-            // double buffering
-            // save the current bitmap to act as previous one when decoding the next frame
-            SwapBitmaps(ref previousFrame, ref currentFrame);
-
-            return result;
-        }
-
         private void DecodeIntraFrame(Stream inStream, BitmapData currentData, int pixelBytes)
         {
             // TODO:
@@ -337,7 +357,7 @@ namespace _016videoslow
                         // assume BGRA pixel format
                         for (int band = 2; band >= 0; band--)
                         {
-                            currentRow[x * pixelBytes + band] = Extensions.ReadByte(inStream);
+                            currentRow[x * pixelBytes + band] = inStream.ReadUByte();
                         }
                         if (pixelBytes == 4)
                         {
@@ -359,7 +379,7 @@ namespace _016videoslow
                 {
                     int yStart = yBlock * mcBlockSize;
                     int xStart = xBlock * mcBlockSize;
-                    MCRecordType mcType = (MCRecordType)Extensions.ReadByte(inStream);
+                    MCRecordType mcType = (MCRecordType)inStream.ReadUByte();
                     switch (mcType)
                     {
                         case MCRecordType.FullBlock:
@@ -410,8 +430,8 @@ namespace _016videoslow
 
         unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
         {
-            int xOffset = inStream.ReadShort();
-            int yOffset = inStream.ReadShort();
+            int xOffset = inStream.ReadSShort();
+            int yOffset = inStream.ReadSShort();
 
             byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
@@ -462,8 +482,6 @@ namespace _016videoslow
                     throw new ArgumentException("Unsupported pixel format");
             }
         }
-
-        #endregion
 
         private int[] PreparePossibleMotionVectors()
         {
@@ -533,7 +551,7 @@ namespace _016videoslow
 
     public static class Extensions
     {
-        public static void WriteShort(this Stream outs, short number)
+        public static void WriteSShort(this Stream outs, short number)
         {
             outs.WriteByte((byte)((number >> 8) & 0xff));
             outs.WriteByte((byte)(number & 0xff));
@@ -556,7 +574,7 @@ namespace _016videoslow
             outs.WriteByte((byte)(number & 0xff));
         }
 
-        public static byte ReadByte(this Stream inputStream)
+        public static byte ReadUByte(this Stream inputStream)
         {
             int number = inputStream.ReadByte();
             if (number < 0) throw new EndOfStreamException();
@@ -572,7 +590,7 @@ namespace _016videoslow
             return (SByte)(((SByte)sign) * ((byte)number));
         }
 
-        public static short ReadShort(this Stream inputStream)
+        public static short ReadSShort(this Stream inputStream)
         {
             int number = 0;
             for (int i = 0; i < 2; i++)
@@ -595,16 +613,5 @@ namespace _016videoslow
             }
             return number;
         }
-
-        public static Color plus(this Color color, Color another)
-        {
-            return Color.FromArgb(color.R + another.R, color.G + another.G, color.B + another.B);
-        }
-
-        public static Color minus(this Color color, Color another)
-        {
-            return Color.FromArgb(color.R - another.R, color.G - another.G, color.B - another.B);
-        }
     }
-
 }
