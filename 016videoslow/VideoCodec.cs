@@ -533,14 +533,14 @@ namespace _016videoslow
             vectors.Add(0);
             // vertical and horizontal translation
             int maxDistance = 64;
-            for (int i = 0; i < maxDistance; i++)
+            for (int i = 1; i < maxDistance; i++)
             {
                 vectors.Add(0);
                 vectors.Add(i);
                 vectors.Add(0);
                 vectors.Add(-i);
             }
-            for (int i = 0; i < maxDistance; i++)
+            for (int i = 1; i < maxDistance; i++)
             {
                 vectors.Add(i);
                 vectors.Add(0);
