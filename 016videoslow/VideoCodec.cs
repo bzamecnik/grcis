@@ -351,8 +351,8 @@ namespace _016videoslow
                     {
                         // temporal prediction
                         int index = x * pixelBytes + band;
-                        SByte diff = (SByte)(inputRow[index] - previousRow[index]);
-                        outStream.WriteSByte(diff);
+                        byte diff = (byte)(inputRow[index] - previousRow[index]);
+                        outStream.WriteByte(diff);
                     }
                 }
             }
@@ -443,7 +443,7 @@ namespace _016videoslow
                     for (int band = 2; band >= 0; band--)
                     {
                         // temporal prediction
-                        SByte diff = inStream.ReadSByte();
+                        byte diff = inStream.ReadUByte();
                         int index = x * pixelBytes + band;
                         currentRow[index] = (byte)(previousRow[index] + diff);
                     }
