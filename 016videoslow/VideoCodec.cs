@@ -339,11 +339,13 @@ namespace _016videoslow
         {
             byte* inputPtr = (byte*)inputData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
-            for (int y = yStart; y < yStart + mcBlockSize; y++)
+            int yMax = Math.Min(yStart + mcBlockSize, frameHeight);
+            int xMax = Math.Min(xStart + mcBlockSize, frameWidth);
+            for (int y = yStart; y < yMax; y++)
             {
                 byte* inputRow = inputPtr + (y * inputData.Stride);
                 byte* previousRow = previousPtr + (y * previousData.Stride);
-                for (int x = xStart; x < xStart + mcBlockSize; x++)
+                for (int x = xStart; x < xMax; x++)
                 {
                     // store (inputFrame[x, y] - previousFrame[x, y])
                     // assume BGRA input pixel format, store as RGB
@@ -427,8 +429,10 @@ namespace _016videoslow
             {
                 debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
             }
+            int yMax = Math.Min(yStart + mcBlockSize, frameHeight);
+            int xMax = Math.Min(xStart + mcBlockSize, frameWidth);
 
-            for (int y = yStart; y < yStart + mcBlockSize; y++)
+            for (int y = yStart; y < yMax; y++)
             {
                 byte* currentRow = currentPtr + (y * currentData.Stride);
                 byte* previousRow = previousPtr + (y * previousData.Stride);
@@ -437,7 +441,7 @@ namespace _016videoslow
                 {
                     debugRow = (byte*)debugFrameData.Scan0 + (y * debugFrameData.Stride);
                 }
-                for (int x = xStart; x < xStart + mcBlockSize; x++)
+                for (int x = xStart; x < xMax; x++)
                 {
                     // assume BGRA input pixel format, store as RGB
                     for (int band = 2; band >= 0; band--)
