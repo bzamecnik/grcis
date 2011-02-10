@@ -36,7 +36,7 @@ namespace _016videoslow
         protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
-        protected bool visualizeMCBlockTypes = false;
+        protected bool visualizeMCBlockTypes = true;
         protected Bitmap debugFrame = null;
         protected BitmapData debugFrameData = null;
 
@@ -44,7 +44,7 @@ namespace _016videoslow
 
         // both X and Y size of a motion compensation block
         protected int mcBlockSize = 8;
-        protected short[] mcPossibleOffsets;
+        protected MotionVector[] mcPossibleOffsets;
 
         StreamWriter log;
 
@@ -259,9 +259,8 @@ namespace _016videoslow
 
                     if (motionVectorFound)
                     {
-                        short xOffset = mcPossibleOffsets[motionVectorOffset];
-                        short yOffset = mcPossibleOffsets[motionVectorOffset + 1];
-                        if ((xOffset == 0) && (yOffset == 0))
+                        MotionVector motionVector = mcPossibleOffsets[motionVectorOffset];
+                        if ((motionVector.x == 0) && (motionVector.y == 0))
                         {
                             outStream.WriteByte((byte)MCRecordType.Identical);
                             identicalBlocksCount++;
@@ -274,8 +273,8 @@ namespace _016videoslow
                             // TODO: store only a difference to the previous motion vector
                             // TODO: it could be possible to store only an index to the vector of
                             // possible motion vectors
-                            outStream.WriteSShort(xOffset);
-                            outStream.WriteSShort(yOffset);
+                            outStream.WriteSShort(motionVector.x);
+                            outStream.WriteSShort(motionVector.y);
                             translatedBlocksCount++;
                         }
                     }
@@ -302,7 +301,7 @@ namespace _016videoslow
 
             // check possible offsets to find an equal shifted
             // block in the previous frame
-            for (int i = 0; !motionVectorFound && (i < mcPossibleOffsets.Length); i += 2)
+            for (int i = 0; !motionVectorFound && (i < mcPossibleOffsets.Length); i++)
             {
                 bool isValidOffset = true;
                 for (int y = yStart; isValidOffset && (y < yStart + mcBlockSize); y++)
@@ -311,8 +310,9 @@ namespace _016videoslow
                     byte* previousRow = previousPtr + (y * previousData.Stride);
                     for (int x = xStart; isValidOffset && (x < xStart + mcBlockSize); x++)
                     {
-                        int xSource = x + mcPossibleOffsets[i];
-                        int ySource = y + mcPossibleOffsets[i + 1];
+                        MotionVector motionVector = mcPossibleOffsets[i];
+                        int xSource = x + motionVector.x;
+                        int ySource = y + motionVector.y;
                         if ((x < 0) || (x >= frameWidth) ||
                             (y < 0) || (y >= frameHeight) ||
                             (xSource < 0) || (xSource >= frameWidth) ||
@@ -325,7 +325,7 @@ namespace _016videoslow
                         for (int band = 0; band < 2; band++)
                         {
                             int inputIndex = x * pixelBytes + band;
-                            int previousIndex = mcPossibleOffsets[i + 1] * previousData.Stride + xSource * pixelBytes + band;
+                            int previousIndex = motionVector.y * previousData.Stride + xSource * pixelBytes + band;
                             if (inputRow[inputIndex] != previousRow[previousIndex])
                             {
                                 // means: inputFrame[x, y] != previousFrame[xSource, ySource])
@@ -401,6 +401,8 @@ namespace _016videoslow
             int xBlocksCount = DivideRoundUp(frameWidth, mcBlockSize);
             int yBlocksCount = DivideRoundUp(frameHeight, mcBlockSize);
 
+            MotionVector motionVector = MotionVector.ZERO;
+
             for (int yBlock = 0; yBlock < yBlocksCount; yBlock++)
             {
                 for (int xBlock = 0; xBlock < xBlocksCount; xBlock++)
@@ -411,12 +413,13 @@ namespace _016videoslow
                     switch (mcType)
                     {
                         case MCRecordType.Identical:
-                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, 0, 0);
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, MotionVector.ZERO);
                             break;
                         case MCRecordType.MotionVector:
-                            int xOffset = inStream.ReadSShort();
-                            int yOffset = inStream.ReadSShort();
-                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, xOffset, yOffset);
+                            motionVector.x = inStream.ReadSShort();
+                            motionVector.y = inStream.ReadSShort();
+
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, motionVector);
                             break;
                         case MCRecordType.FullBlock:
                             DecodeFullBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart);
@@ -469,7 +472,7 @@ namespace _016videoslow
             }
         }
 
-        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart, int xOffset, int yOffset)
+        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart, MotionVector motionVector)
         {
             byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
@@ -479,12 +482,12 @@ namespace _016videoslow
                 debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
             }
 
-            bool isIdenticalBlock = (xOffset == 0) && (yOffset == 0);
+            bool isIdenticalBlock = (motionVector.x == 0) && (motionVector.y == 0);
 
             for (int y = yStart; y < yStart + mcBlockSize; y++)
             {
                 byte* currentRow = currentPtr + (y * currentData.Stride);
-                byte* previousRow = previousPtr + ((y + yOffset) * previousData.Stride);
+                byte* previousRow = previousPtr + ((y + motionVector.y) * previousData.Stride);
                 byte* debugRow = (byte*)0;
                 if (visualizeMCBlockTypes)
                 {
@@ -497,7 +500,7 @@ namespace _016videoslow
                     {
                         // temporal prediction
                         int currentIndex = x * pixelBytes + band;
-                        int previousIndex = currentIndex + xOffset * pixelBytes;
+                        int previousIndex = currentIndex + motionVector.x * pixelBytes;
                         currentRow[currentIndex] = previousRow[previousIndex];
                     }
                     if (pixelBytes == 4)
@@ -535,29 +538,24 @@ namespace _016videoslow
             }
         }
 
-        private short[] PreparePossibleMotionVectors()
+        private MotionVector[] PreparePossibleMotionVectors()
         {
-            List<short> vectors = new List<short>();
+            List<MotionVector> vectors = new List<MotionVector>();
             // Origin - no translation.
             // This is most probable.
-            vectors.Add(0);
-            vectors.Add(0);
+            vectors.Add(MotionVector.ZERO);
             // Add offsets for vertical and horizontal translation.
             // This is very probable.
             int maxDistance = 64;
             for (short i = 1; i < maxDistance; i++)
             {
-                vectors.Add(0);
-                vectors.Add(i);
-                vectors.Add(0);
-                vectors.Add((short)-i);
+                vectors.Add(new MotionVector(0, i));
+                vectors.Add(new MotionVector(0, (short)-i));
             }
             for (short i = 1; i < maxDistance; i++)
             {
-                vectors.Add(i);
-                vectors.Add(0);
-                vectors.Add((short)-i);
-                vectors.Add(0);
+                vectors.Add(new MotionVector(i, 0));
+                vectors.Add(new MotionVector((short)-i, 0));
             }
             // Add offsets for exhaustive search in remaining positions
             // within a defined square (possible smaller than the V and H directions).
@@ -566,17 +564,13 @@ namespace _016videoslow
             for (short i = 1; i < squareSize; i++)
             {
                 // right down quadrant
-                vectors.Add(i);
-                vectors.Add(i);
+                vectors.Add(new MotionVector(i, i));
                 // right up quadrant
-                vectors.Add(i);
-                vectors.Add((short)-i);
+                vectors.Add(new MotionVector(i, (short)-i));
                 // left up quadrant
-                vectors.Add((short)-i);
-                vectors.Add(i);
+                vectors.Add(new MotionVector((short)-i, i));
                 // left down quadrant
-                vectors.Add((short)-i);
-                vectors.Add((short)-i);
+                vectors.Add(new MotionVector((short)-i, (short)-i));
             }
             return vectors.ToArray();
         }
@@ -610,6 +604,24 @@ namespace _016videoslow
         /// The records contains the full block, ie. values for all pixels.
         /// </summary>
         FullBlock,
+    }
+
+    public struct MotionVector {
+        public short x;
+        public short y;
+
+        public static readonly MotionVector ZERO = new MotionVector(0, 0);
+
+        public MotionVector(short x, short y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("[{0}, {1}]", x, y);
+        }
     }
 
     public class EndOfStreamException : System.Exception, ISerializable
