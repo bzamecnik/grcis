@@ -40,13 +40,16 @@ namespace _016videoslow
         protected int mcBlockSize = 8;
         protected int[] mcPossibleOffsets;
 
+        StreamWriter log;
+
         #endregion
 
         #region constructor
 
-        public VideoCodec()
+        public VideoCodec(StreamWriter log)
         {
             mcPossibleOffsets = PreparePossibleMotionVectors();
+            this.log = log;
         }
 
         #endregion
@@ -188,7 +191,7 @@ namespace _016videoslow
                 if (visualizeMCBlockTypes)
                 {
                     debugFrame.UnlockBits(debugFrameData);
-                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex + 1), ImageFormat.Png);
+                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex), ImageFormat.Png);
                 }
             }
             catch (EndOfStreamException)
@@ -232,6 +235,10 @@ namespace _016videoslow
             int xBlocksCount = DivideRoundUp(frameWidth, mcBlockSize);
             int yBlocksCount = DivideRoundUp(frameHeight, mcBlockSize);
 
+            int identicalBlocksCount = 0;
+            int translatedBlocksCount = 0;
+            int fullBlocksCount = 0;
+
             for (int yBlock = 0; yBlock < yBlocksCount; yBlock++)
             {
                 for (int xBlock = 0; xBlock < xBlocksCount; xBlock++)
@@ -246,14 +253,25 @@ namespace _016videoslow
 
                     if (motionVectorFound)
                     {
-                        // store a record type being a motion vector
-                        outStream.WriteByte((byte)MCRecordType.MotionVector);
-                        // store the motion vector itself
-                        // TODO: store only a difference to the previous motion vector
-                        // TODO: it could be possible to store only an index to the vector of
-                        // possible motion vectors
-                        outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset]);
-                        outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset + 1]);
+                        int xOffset = mcPossibleOffsets[motionVectorOffset];
+                        int yOffset = mcPossibleOffsets[motionVectorOffset + 1];
+                        if ((xOffset == 0) && (yOffset == 0))
+                        {
+                            outStream.WriteByte((byte)MCRecordType.Identical);
+                            identicalBlocksCount++;
+                        }
+                        else
+                        {
+                            // store a record type being a motion vector
+                            outStream.WriteByte((byte)MCRecordType.MotionVector);
+                            // store the motion vector itself
+                            // TODO: store only a difference to the previous motion vector
+                            // TODO: it could be possible to store only an index to the vector of
+                            // possible motion vectors
+                            outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset]);
+                            outStream.WriteSShort((short)mcPossibleOffsets[motionVectorOffset + 1]);
+                            translatedBlocksCount++;
+                        }
                     }
                     else
                     {
@@ -261,9 +279,11 @@ namespace _016videoslow
                         outStream.WriteByte((byte)MCRecordType.FullBlock);
                         // store the full block contents
                         EncodeFullBlock(outStream, inputData, previousData, pixelBytes, yStart, xStart);
+                        fullBlocksCount++;
                     }
                 }
             }
+            Log("Block counts - identical: {0}, translated: {1}, full: {2}", identicalBlocksCount, translatedBlocksCount, fullBlocksCount);
         }
 
         unsafe private bool SearchMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, out int motionVectorOffset)
@@ -382,12 +402,18 @@ namespace _016videoslow
                     MCRecordType mcType = (MCRecordType)inStream.ReadUByte();
                     switch (mcType)
                     {
+                        case MCRecordType.Identical:
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, 0, 0);
+                            break;
+                        case MCRecordType.MotionVector:
+                            int xOffset = inStream.ReadSShort();
+                            int yOffset = inStream.ReadSShort();
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, xOffset, yOffset);
+                            break;
                         case MCRecordType.FullBlock:
                             DecodeFullBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart);
                             break;
-                        case MCRecordType.MotionVector:
-                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart);
-                            break;
+                        
                     }
                 }
             }
@@ -428,11 +454,8 @@ namespace _016videoslow
             }
         }
 
-        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
+        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart, int xOffset, int yOffset)
         {
-            int xOffset = inStream.ReadSShort();
-            int yOffset = inStream.ReadSShort();
-
             byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
             for (int y = yStart; y < yStart + mcBlockSize; y++)
@@ -508,6 +531,13 @@ namespace _016videoslow
             return vectors.ToArray();
         }
 
+        private void Log(String message, params object[] parameters)
+        {
+            if (log != null)
+            {
+                log.WriteLine(String.Format(message, parameters));
+            }
+        }
     }
 
     /// <summary>
@@ -516,7 +546,13 @@ namespace _016videoslow
     public enum MCRecordType
     {
         /// <summary>
-        /// The record contains only a motion vector, ie. offset of an equal
+        /// The motion vector is [0, 0], ie. the block is identical to the
+        /// block in the previous frame and there is no offset needed to be
+        /// stored.
+        /// </summary>
+        Identical,
+        /// <summary>
+        /// The record contains only a motion vector, ie. offset of an identical
         /// block found in a previous frame.
         /// </summary>
         MotionVector,
