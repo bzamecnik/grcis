@@ -30,7 +30,7 @@ namespace _016videoslow
         protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
-        protected bool visualizeMCBlockTypes = true;
+        protected bool visualizeMCBlockTypes = false;
         protected Bitmap debugFrame = null;
         protected BitmapData debugFrameData = null;
 
@@ -168,10 +168,10 @@ namespace _016videoslow
 
                 if (visualizeMCBlockTypes)
                 {
-                    debugFrame = new Bitmap(frameWidth, frameHeight, currentData.PixelFormat);
+                    debugFrame = new Bitmap(frameWidth, frameHeight, PixelFormat.Format24bppRgb);
                     debugFrameData = debugFrame.LockBits(
                         new Rectangle(0, 0, frameWidth, frameHeight),
-                        ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+                        ImageLockMode.ReadOnly, debugFrame.PixelFormat);
                 }
 
                 int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
@@ -413,7 +413,6 @@ namespace _016videoslow
                         case MCRecordType.FullBlock:
                             DecodeFullBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart);
                             break;
-                        
                     }
                 }
             }
@@ -423,6 +422,12 @@ namespace _016videoslow
         {
             byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
+            int debugPixelBytes = pixelBytes;
+            if (visualizeMCBlockTypes)
+            {
+                debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
+            }
+
             for (int y = yStart; y < yStart + mcBlockSize; y++)
             {
                 byte* currentRow = currentPtr + (y * currentData.Stride);
@@ -445,10 +450,10 @@ namespace _016videoslow
 
                     if (visualizeMCBlockTypes)
                     {
-                        int index = x * pixelBytes;
+                        int index = x * debugPixelBytes;
                         debugRow[index] = 0;
-                        debugRow[index + 1] = 255;
-                        debugRow[index + 2] = 0;
+                        debugRow[index + 1] = 0;
+                        debugRow[index + 2] = 255; // red
                     }
                 }
             }
@@ -458,9 +463,17 @@ namespace _016videoslow
         {
             byte* currentPtr = (byte*)currentData.Scan0;
             byte* previousPtr = (byte*)previousData.Scan0;
+            int debugPixelBytes = pixelBytes;
+            if (visualizeMCBlockTypes)
+            {
+                debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
+            }
+
+            bool isIdenticalBlock = (xOffset == 0) && (yOffset == 0);
+
             for (int y = yStart; y < yStart + mcBlockSize; y++)
             {
-                byte* inputRow = currentPtr + (y * currentData.Stride);
+                byte* currentRow = currentPtr + (y * currentData.Stride);
                 byte* previousRow = previousPtr + ((y + yOffset) * previousData.Stride);
                 byte* debugRow = (byte*)0;
                 if (visualizeMCBlockTypes)
@@ -473,16 +486,22 @@ namespace _016videoslow
                     for (int band = 2; band >= 0; band--)
                     {
                         // temporal prediction
-                        int inputIndex = x * pixelBytes + band;
-                        int previousIndex = inputIndex + xOffset * pixelBytes;
-                        inputRow[inputIndex] = previousRow[previousIndex];
+                        int currentIndex = x * pixelBytes + band;
+                        int previousIndex = currentIndex + xOffset * pixelBytes;
+                        currentRow[currentIndex] = previousRow[previousIndex];
+                    }
+                    if (pixelBytes == 4)
+                    {
+                        currentRow[x * pixelBytes + 3] = 255; // assume full alpha 
                     }
                     if (visualizeMCBlockTypes)
                     {
-                        int index = x * pixelBytes;
-                        debugRow[index] = 0;
-                        debugRow[index + 1] = 0;
-                        debugRow[index + 2] = 255;
+                        // identical - green
+                        // translated - blue
+                        int index = x * debugPixelBytes;
+                        debugRow[index] = (byte)((isIdenticalBlock) ? 0 : 255);
+                        debugRow[index + 1] = (byte)((isIdenticalBlock) ? 255 : 0);
+                        debugRow[index + 2] = 0;
                     }
                 }
             }

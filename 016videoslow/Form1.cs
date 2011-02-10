@@ -100,18 +100,22 @@ namespace _016videoslow
             watch.Reset();
             watch.Start();
             long lastWatchTime = 0;
+            long totalEncodingTime = 0;
 
             frameImage = (Bitmap)Image.FromFile(imageFileName);
-            lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
 
             VideoCodec codec = new VideoCodec(log);
             outStream = codec.EncodeHeader(fs, frameImage.Width, frameImage.Height, (float)numericFps.Value, frameImage.PixelFormat);
-            lastWatchTime = LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
             do
             {
                 codec.EncodeFrame(frameIndex, frameImage, outStream);
-                lastWatchTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                
+                long framEncTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                totalEncodingTime += framEncTime;
+                lastWatchTime += framEncTime;
                 string labelText = String.Format("Encoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
                 BeginInvoke((Action)delegate
                 {
@@ -122,12 +126,13 @@ namespace _016videoslow
                 imageFileName = String.Format(textInputMask.Text, frameIndex);
                 if (!File.Exists(imageFileName)) break;
                 frameImage = (Bitmap)Image.FromFile(imageFileName);
-                lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
             } while (true);
 
             outStream.Close();
             fs.Close();
-            log.WriteLine("Finished encoding the seqence of {0} frames. Total time: {1} ms.", frameIndex, watch.ElapsedMilliseconds);
+            log.WriteLine("Finished encoding the seqence of {0} frames.", frameIndex);
+            log.WriteLine("Total time: {0} ms. Encoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalEncodingTime, totalEncodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
         }
@@ -135,8 +140,9 @@ namespace _016videoslow
         private static long LogCurrentStopwatchState(string message, StreamWriter log, Stopwatch watch, long lastWatchTime)
         {
             long currentWatchTime = watch.ElapsedMilliseconds;
-            log.WriteLine(message, currentWatchTime - lastWatchTime);
-            return currentWatchTime;
+            long diff = currentWatchTime - lastWatchTime;
+            log.WriteLine(message, diff);
+            return diff;
         }
 
         private void buttonDecode_Click(object sender, EventArgs e)
@@ -164,18 +170,21 @@ namespace _016videoslow
             watch.Reset();
             watch.Start();
             long lastWatchTime = 0;
+            long totalDecodingTime = 0;
 
             Stream inStream = codec.DecodeHeader(fs);
-            lastWatchTime = LogCurrentStopwatchState("Decoded header in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Decoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
             do
             {
                 frameImage = codec.DecodeFrame(frameIndex, inStream);
                 if (frameImage == null) break;
-                lastWatchTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                long framDecTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                totalDecodingTime += framDecTime;
+                lastWatchTime += framDecTime;
                 imageFileName = String.Format(textOutputMask.Text, frameIndex);
                 frameImage.Save(imageFileName, ImageFormat.Png);
-                lastWatchTime = LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                lastWatchTime += LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
                 string labelText = String.Format("Decoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
                 BeginInvoke((Action)delegate
                 {
@@ -187,7 +196,8 @@ namespace _016videoslow
 
             inStream.Close();
             fs.Close();
-            log.WriteLine("Finished decoding the seqence of {0} frames. Total time: {1} ms.", frameIndex, watch.ElapsedMilliseconds);
+            log.WriteLine("Finished decoding the seqence of {0} frames.", frameIndex);
+            log.WriteLine("Total time: {0} ms. Decoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalDecodingTime, totalDecodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
         }
