@@ -24,6 +24,10 @@ namespace _016videoslow
         public Form1()
         {
             InitializeComponent();
+            mcHorizVertNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_LINE_SIZE;
+            mcSquareNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_SQUARE_SIZE;
+            blockTypeVizCheckBox.Checked = VideoCodec.DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
+            deflateCheckBox.Checked = VideoCodec.DEFAULT_DEFLATE_COMPRESSION_ENABLED;
         }
 
         private void buttonCapture_Click(object sender, EventArgs e)
@@ -105,7 +109,7 @@ namespace _016videoslow
             frameImage = (Bitmap)Image.FromFile(imageFileName);
             lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
 
-            VideoCodec codec = new VideoCodec(log);
+            VideoCodec codec = GetVideoCodec(log);
             outStream = codec.EncodeHeader(fs, frameImage.Width, frameImage.Height, (float)numericFps.Value, frameImage.PixelFormat);
             lastWatchTime += LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
@@ -137,6 +141,16 @@ namespace _016videoslow
             log.Close();
         }
 
+        private VideoCodec GetVideoCodec(StreamWriter log)
+        {
+            VideoCodec codec = new VideoCodec(log);
+            codec.MCSearchLineSize = (int)mcHorizVertNumeric.Value;
+            codec.MCSearchSquareSize = (int)mcSquareNumeric.Value;
+            codec.VisualizeMCBlockTypes = blockTypeVizCheckBox.Checked;
+            codec.DeflateCompressionEnabled = deflateCheckBox.Checked;
+            return codec;
+        }
+
         private static long LogCurrentStopwatchState(string message, StreamWriter log, Stopwatch watch, long lastWatchTime)
         {
             long currentWatchTime = watch.ElapsedMilliseconds;
@@ -164,7 +178,7 @@ namespace _016videoslow
             }
 
             StreamWriter log = new StreamWriter(new FileStream("decodelog.txt", FileMode.Create));
-            VideoCodec codec = new VideoCodec(log);
+            VideoCodec codec = GetVideoCodec(log);
             log.WriteLine("Decoding an image sequence from a compressed video file: " + videoFileName);
             Stopwatch watch = new Stopwatch();
             watch.Reset();
@@ -220,8 +234,8 @@ namespace _016videoslow
                 return;
             }
 
-            StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
-            VideoCodec codec = new VideoCodec(log);
+            //StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
+            VideoCodec codec = GetVideoCodec(null);
 
             Stream inStream = codec.DecodeHeader(fs);
 
@@ -281,7 +295,7 @@ namespace _016videoslow
 
             inStream.Close();
             fs.Close();
-            log.Close();
+            //log.Close();
         }
 
         private void playbackBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
