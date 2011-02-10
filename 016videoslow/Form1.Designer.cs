@@ -44,6 +44,9 @@
         this.codingStatusLabel = new System.Windows.Forms.Label();
         this.encodingBackgroundWorker = new System.ComponentModel.BackgroundWorker();
         this.decodingBackgroundWorker = new System.ComponentModel.BackgroundWorker();
+        this.buttonPlay = new System.Windows.Forms.Button();
+        this.playbackBackgroundWorker = new System.ComponentModel.BackgroundWorker();
+        this.buttonStop = new System.Windows.Forms.Button();
         ((System.ComponentModel.ISupportInitialize)(this.numericFps)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.numericDuration)).BeginInit();
         this.SuspendLayout();
@@ -51,7 +54,7 @@
         // buttonDecode
         // 
         this.buttonDecode.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonDecode.Location = new System.Drawing.Point(361, 98);
+        this.buttonDecode.Location = new System.Drawing.Point(361, 99);
         this.buttonDecode.Name = "buttonDecode";
         this.buttonDecode.Size = new System.Drawing.Size(144, 23);
         this.buttonDecode.TabIndex = 5;
@@ -213,11 +216,40 @@
         // 
         this.decodingBackgroundWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.decodingBackgroundWorker_DoWork);
         // 
+        // buttonPlay
+        // 
+        this.buttonPlay.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+        this.buttonPlay.Location = new System.Drawing.Point(361, 130);
+        this.buttonPlay.Name = "buttonPlay";
+        this.buttonPlay.Size = new System.Drawing.Size(144, 23);
+        this.buttonPlay.TabIndex = 5;
+        this.buttonPlay.Text = "Play";
+        this.buttonPlay.UseVisualStyleBackColor = true;
+        this.buttonPlay.Click += new System.EventHandler(this.buttonPlay_Click);
+        // 
+        // playbackBackgroundWorker
+        // 
+        this.playbackBackgroundWorker.WorkerSupportsCancellation = true;
+        this.playbackBackgroundWorker.DoWork += new System.ComponentModel.DoWorkEventHandler(this.playbackBackgroundWorker_DoWork);
+        this.playbackBackgroundWorker.RunWorkerCompleted += new System.ComponentModel.RunWorkerCompletedEventHandler(this.playbackBackgroundWorker_RunWorkerCompleted);
+        // 
+        // buttonStop
+        // 
+        this.buttonStop.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+        this.buttonStop.Location = new System.Drawing.Point(361, 159);
+        this.buttonStop.Name = "buttonStop";
+        this.buttonStop.Size = new System.Drawing.Size(144, 23);
+        this.buttonStop.TabIndex = 5;
+        this.buttonStop.Text = "Stop";
+        this.buttonStop.UseVisualStyleBackColor = true;
+        this.buttonStop.Visible = false;
+        this.buttonStop.Click += new System.EventHandler(this.buttonStop_Click);
+        // 
         // Form1
         // 
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(517, 162);
+        this.ClientSize = new System.Drawing.Size(517, 201);
         this.Controls.Add(this.codingStatusLabel);
         this.Controls.Add(this.label5);
         this.Controls.Add(this.labelSpeed);
@@ -231,6 +263,8 @@
         this.Controls.Add(this.textOutputMask);
         this.Controls.Add(this.textInputMask);
         this.Controls.Add(this.buttonEncode);
+        this.Controls.Add(this.buttonStop);
+        this.Controls.Add(this.buttonPlay);
         this.Controls.Add(this.buttonDecode);
         this.MinimumSize = new System.Drawing.Size(500, 150);
         this.Name = "Form1";
@@ -260,6 +294,9 @@
     private System.Windows.Forms.Label codingStatusLabel;
     private System.ComponentModel.BackgroundWorker encodingBackgroundWorker;
     private System.ComponentModel.BackgroundWorker decodingBackgroundWorker;
+    private System.Windows.Forms.Button buttonPlay;
+    private System.ComponentModel.BackgroundWorker playbackBackgroundWorker;
+    private System.Windows.Forms.Button buttonStop;
   }
 }
 

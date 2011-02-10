@@ -25,6 +25,12 @@ namespace _016videoslow
 
         protected int frameHeight = 0;
 
+        public Size FrameSize {
+            get {
+                return new Size(frameWidth, frameHeight);
+            }
+        }
+
         protected float framesPerSecond = 0.0f;
 
         protected Bitmap currentFrame = null;

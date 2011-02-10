@@ -201,5 +201,109 @@ namespace _016videoslow
             watch.Stop();
             log.Close();
         }
+
+        private void buttonPlay_Click(object sender, EventArgs e)
+        {
+            if (!playbackBackgroundWorker.IsBusy)
+            {
+                VideoForm videoForm = new VideoForm();
+                playbackBackgroundWorker.RunWorkerAsync(videoForm);
+            }
+        }
+
+        private void playbackBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            // TODO: handle situation when the video file is not available
+            FileStream fs = new FileStream(videoFileName, FileMode.Open);
+            if (fs == null)
+            {
+                return;
+            }
+
+            StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
+            VideoCodec codec = new VideoCodec(log);
+
+            Stream inStream = codec.DecodeHeader(fs);
+
+            VideoForm videoForm = (VideoForm)e.Argument;
+            e.Result = videoForm;
+
+            double playbackFPS = (double)numericFps.Value;
+            
+            BeginInvoke((Action)delegate
+            {
+                videoForm.Size = codec.FrameSize;
+                videoForm.PlaybackFPS = playbackFPS;
+                videoForm.Show();
+            });
+            
+            long expectedFrameDuration = (long)(1000.0 / playbackFPS);
+            long lastTime = 0;
+            long lastFPSTime = 0;
+            Stopwatch sw = new Stopwatch();
+            sw.Reset();
+            sw.Start();
+
+            int frameIndex = 0;
+            do
+            {
+                lastTime = sw.ElapsedMilliseconds;
+                frameImage = codec.DecodeFrame(frameIndex, inStream);
+                if (frameImage == null) break;
+
+                long currentTime = sw.ElapsedMilliseconds;
+                long decodingTime = currentTime - lastTime;
+                long sleepTime = expectedFrameDuration - decodingTime;
+
+                if (playbackBackgroundWorker.CancellationPending)
+                {
+                    e.Cancel = true;
+                    break;
+                }
+
+                videoForm.Image = frameImage;
+
+                if ((currentTime - lastFPSTime) > 250)
+                {
+                    videoForm.DecodingFPS = 1000.0 / (double)decodingTime;
+                    lastFPSTime = currentTime;
+                }
+
+                if (sleepTime > 0)
+                {
+                    Thread.Sleep((int)sleepTime);
+                }
+                frameIndex++;
+            }
+            while (!playbackBackgroundWorker.CancellationPending);
+
+            sw.Stop();
+
+            inStream.Close();
+            fs.Close();
+            log.Close();
+        }
+
+        private void playbackBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            VideoForm videoForm = (VideoForm)e.Result;
+            BeginInvoke((Action)delegate
+            {
+                videoForm.Hide();
+            });
+        }
+
+        public void StopVideoPlayback()
+        {
+            BeginInvoke((Action)delegate
+            {
+                playbackBackgroundWorker.CancelAsync();
+            });
+        }
+
+        private void buttonStop_Click(object sender, EventArgs e)
+        {
+            StopVideoPlayback();
+        }
     }
 }
