@@ -560,17 +560,20 @@ namespace _016videoslow
             // Add offsets for exhaustive search in remaining positions
             // within a defined square (possible smaller than the V and H directions).
             // This is less probable.
-            int squareSize = 8;
+            int squareSize = 16;
             for (short i = 1; i < squareSize; i++)
             {
-                // right down quadrant
-                vectors.Add(new MotionVector(i, i));
-                // right up quadrant
-                vectors.Add(new MotionVector(i, (short)-i));
-                // left up quadrant
-                vectors.Add(new MotionVector((short)-i, i));
-                // left down quadrant
-                vectors.Add(new MotionVector((short)-i, (short)-i));
+                for (short j = 1; j < squareSize; j++)
+                {
+                    // right down quadrant
+                    vectors.Add(new MotionVector(i, j));
+                    // right up quadrant
+                    vectors.Add(new MotionVector(i, (short)-j));
+                    // left up quadrant
+                    vectors.Add(new MotionVector((short)-i, j));
+                    // left down quadrant
+                    vectors.Add(new MotionVector((short)-i, (short)-j));
+                }
             }
             return vectors.ToArray();
         }
