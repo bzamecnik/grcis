@@ -532,10 +532,12 @@ namespace _016videoslow
         private int[] PreparePossibleMotionVectors()
         {
             List<int> vectors = new List<int>();
-            // origin
+            // Origin - no translation.
+            // This is most probable.
             vectors.Add(0);
             vectors.Add(0);
-            // vertical and horizontal translation
+            // Add offsets for vertical and horizontal translation.
+            // This is very probable.
             int maxDistance = 64;
             for (int i = 1; i < maxDistance; i++)
             {
@@ -550,6 +552,25 @@ namespace _016videoslow
                 vectors.Add(0);
                 vectors.Add(-i);
                 vectors.Add(0);
+            }
+            // Add offsets for exhaustive search in remaining positions
+            // within a defined square (possible smaller than the V and H directions).
+            // This is less probable.
+            int squareSize = 8;
+            for (int i = 1; i < squareSize; i++)
+            {
+                // right down quadrant
+                vectors.Add(i);
+                vectors.Add(i);
+                // right up quadrant
+                vectors.Add(i);
+                vectors.Add(-i);
+                // left up quadrant
+                vectors.Add(-i);
+                vectors.Add(i);
+                // left down quadrant
+                vectors.Add(-i);
+                vectors.Add(-i);
             }
             return vectors.ToArray();
         }
