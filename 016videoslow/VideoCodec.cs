@@ -322,7 +322,7 @@ namespace _016videoslow
                             break;
                         }
                         // assume BGRA pixel format
-                        for (int band = 0; band < 2; band++)
+                        for (int band = 0; band < 3; band++)
                         {
                             int inputIndex = x * pixelBytes + band;
                             int previousIndex = motionVector.y * previousData.Stride + xSource * pixelBytes + band;
