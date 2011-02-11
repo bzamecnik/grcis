@@ -48,6 +48,8 @@
         this.playbackBackgroundWorker = new System.ComponentModel.BackgroundWorker();
         this.buttonStop = new System.Windows.Forms.Button();
         this.groupBox1 = new System.Windows.Forms.GroupBox();
+        this.intraFreqNumeric = new System.Windows.Forms.NumericUpDown();
+        this.label9 = new System.Windows.Forms.Label();
         this.deflateCheckBox = new System.Windows.Forms.CheckBox();
         this.mcSquareNumeric = new System.Windows.Forms.NumericUpDown();
         this.mcHorizVertNumeric = new System.Windows.Forms.NumericUpDown();
@@ -55,23 +57,26 @@
         this.label7 = new System.Windows.Forms.Label();
         this.label6 = new System.Windows.Forms.Label();
         this.blockTypeVizCheckBox = new System.Windows.Forms.CheckBox();
-        this.label9 = new System.Windows.Forms.Label();
-        this.intraFreqNumeric = new System.Windows.Forms.NumericUpDown();
+        this.label10 = new System.Windows.Forms.Label();
+        this.videoFileNameTextBox = new System.Windows.Forms.TextBox();
+        this.videoFileNameOpenButton = new System.Windows.Forms.Button();
+        this.videoFileNameSaveButton = new System.Windows.Forms.Button();
+        this.label11 = new System.Windows.Forms.Label();
         ((System.ComponentModel.ISupportInitialize)(this.numericFps)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.numericDuration)).BeginInit();
         this.groupBox1.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcSquareNumeric)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcHorizVertNumeric)).BeginInit();
-        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).BeginInit();
         this.SuspendLayout();
         // 
         // buttonDecode
         // 
         this.buttonDecode.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonDecode.Location = new System.Drawing.Point(361, 294);
+        this.buttonDecode.Location = new System.Drawing.Point(361, 355);
         this.buttonDecode.Name = "buttonDecode";
         this.buttonDecode.Size = new System.Drawing.Size(144, 23);
-        this.buttonDecode.TabIndex = 5;
+        this.buttonDecode.TabIndex = 15;
         this.buttonDecode.Text = "Decode";
         this.buttonDecode.UseVisualStyleBackColor = true;
         this.buttonDecode.Click += new System.EventHandler(this.buttonDecode_Click);
@@ -79,10 +84,10 @@
         // buttonEncode
         // 
         this.buttonEncode.Anchor = System.Windows.Forms.AnchorStyles.Right;
-        this.buttonEncode.Location = new System.Drawing.Point(361, 194);
+        this.buttonEncode.Location = new System.Drawing.Point(361, 283);
         this.buttonEncode.Name = "buttonEncode";
         this.buttonEncode.Size = new System.Drawing.Size(144, 23);
-        this.buttonEncode.TabIndex = 13;
+        this.buttonEncode.TabIndex = 12;
         this.buttonEncode.Text = "Encode";
         this.buttonEncode.UseVisualStyleBackColor = true;
         this.buttonEncode.Click += new System.EventHandler(this.buttonEncode_Click);
@@ -92,15 +97,15 @@
         this.textInputMask.Location = new System.Drawing.Point(95, 75);
         this.textInputMask.Name = "textInputMask";
         this.textInputMask.Size = new System.Drawing.Size(244, 20);
-        this.textInputMask.TabIndex = 14;
+        this.textInputMask.TabIndex = 3;
         this.textInputMask.Text = "input\\frame{0:0000}.png";
         // 
         // textOutputMask
         // 
-        this.textOutputMask.Location = new System.Drawing.Point(95, 253);
+        this.textOutputMask.Location = new System.Drawing.Point(96, 314);
         this.textOutputMask.Name = "textOutputMask";
         this.textOutputMask.Size = new System.Drawing.Size(244, 20);
-        this.textOutputMask.TabIndex = 15;
+        this.textOutputMask.TabIndex = 13;
         this.textOutputMask.Text = "output\\frame{0:0000}.png";
         // 
         // label1
@@ -128,7 +133,7 @@
             65536});
         this.numericFps.Name = "numericFps";
         this.numericFps.Size = new System.Drawing.Size(57, 20);
-        this.numericFps.TabIndex = 17;
+        this.numericFps.TabIndex = 1;
         this.numericFps.Value = new decimal(new int[] {
             10,
             0,
@@ -147,7 +152,7 @@
         // label3
         // 
         this.label3.AutoSize = true;
-        this.label3.Location = new System.Drawing.Point(19, 253);
+        this.label3.Location = new System.Drawing.Point(20, 317);
         this.label3.Name = "label3";
         this.label3.Size = new System.Drawing.Size(70, 13);
         this.label3.TabIndex = 19;
@@ -156,10 +161,10 @@
         // buttonCapture
         // 
         this.buttonCapture.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonCapture.Location = new System.Drawing.Point(361, 41);
+        this.buttonCapture.Location = new System.Drawing.Point(361, 73);
         this.buttonCapture.Name = "buttonCapture";
         this.buttonCapture.Size = new System.Drawing.Size(144, 23);
-        this.buttonCapture.TabIndex = 20;
+        this.buttonCapture.TabIndex = 4;
         this.buttonCapture.Text = "Screen capture";
         this.buttonCapture.UseVisualStyleBackColor = true;
         this.buttonCapture.Click += new System.EventHandler(this.buttonCapture_Click);
@@ -189,7 +194,7 @@
             0});
         this.numericDuration.Name = "numericDuration";
         this.numericDuration.Size = new System.Drawing.Size(85, 20);
-        this.numericDuration.TabIndex = 22;
+        this.numericDuration.TabIndex = 2;
         this.numericDuration.Value = new decimal(new int[] {
             10,
             0,
@@ -208,7 +213,7 @@
         // label5
         // 
         this.label5.AutoSize = true;
-        this.label5.Location = new System.Drawing.Point(12, 310);
+        this.label5.Location = new System.Drawing.Point(19, 360);
         this.label5.Name = "label5";
         this.label5.Size = new System.Drawing.Size(40, 13);
         this.label5.TabIndex = 24;
@@ -217,10 +222,11 @@
         // codingStatusLabel
         // 
         this.codingStatusLabel.AutoSize = true;
-        this.codingStatusLabel.Location = new System.Drawing.Point(87, 320);
+        this.codingStatusLabel.Location = new System.Drawing.Point(70, 360);
         this.codingStatusLabel.Name = "codingStatusLabel";
-        this.codingStatusLabel.Size = new System.Drawing.Size(0, 13);
+        this.codingStatusLabel.Size = new System.Drawing.Size(38, 13);
         this.codingStatusLabel.TabIndex = 25;
+        this.codingStatusLabel.Text = "Ready";
         // 
         // encodingBackgroundWorker
         // 
@@ -233,10 +239,10 @@
         // buttonPlay
         // 
         this.buttonPlay.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonPlay.Location = new System.Drawing.Point(195, 363);
+        this.buttonPlay.Location = new System.Drawing.Point(195, 406);
         this.buttonPlay.Name = "buttonPlay";
         this.buttonPlay.Size = new System.Drawing.Size(144, 23);
-        this.buttonPlay.TabIndex = 5;
+        this.buttonPlay.TabIndex = 16;
         this.buttonPlay.Text = "Play";
         this.buttonPlay.UseVisualStyleBackColor = true;
         this.buttonPlay.Click += new System.EventHandler(this.buttonPlay_Click);
@@ -251,10 +257,10 @@
         // 
         this.buttonStop.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.buttonStop.Enabled = false;
-        this.buttonStop.Location = new System.Drawing.Point(361, 363);
+        this.buttonStop.Location = new System.Drawing.Point(361, 406);
         this.buttonStop.Name = "buttonStop";
         this.buttonStop.Size = new System.Drawing.Size(144, 23);
-        this.buttonStop.TabIndex = 5;
+        this.buttonStop.TabIndex = 17;
         this.buttonStop.Text = "Stop";
         this.buttonStop.UseVisualStyleBackColor = true;
         this.buttonStop.Click += new System.EventHandler(this.buttonStop_Click);
@@ -276,13 +282,44 @@
         this.groupBox1.TabStop = false;
         this.groupBox1.Text = "Encoding options";
         // 
+        // intraFreqNumeric
+        // 
+        this.intraFreqNumeric.Location = new System.Drawing.Point(146, 106);
+        this.intraFreqNumeric.Maximum = new decimal(new int[] {
+            100000,
+            0,
+            0,
+            0});
+        this.intraFreqNumeric.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+        this.intraFreqNumeric.Name = "intraFreqNumeric";
+        this.intraFreqNumeric.Size = new System.Drawing.Size(120, 20);
+        this.intraFreqNumeric.TabIndex = 8;
+        this.intraFreqNumeric.Value = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+        // 
+        // label9
+        // 
+        this.label9.AutoSize = true;
+        this.label9.Location = new System.Drawing.Point(7, 108);
+        this.label9.Name = "label9";
+        this.label9.Size = new System.Drawing.Size(110, 13);
+        this.label9.TabIndex = 6;
+        this.label9.Text = "Intra frame frequency:";
+        // 
         // deflateCheckBox
         // 
         this.deflateCheckBox.AutoSize = true;
         this.deflateCheckBox.Location = new System.Drawing.Point(10, 88);
         this.deflateCheckBox.Name = "deflateCheckBox";
         this.deflateCheckBox.Size = new System.Drawing.Size(164, 17);
-        this.deflateCheckBox.TabIndex = 5;
+        this.deflateCheckBox.TabIndex = 7;
         this.deflateCheckBox.Text = "Use DEFLATE compression?";
         this.deflateCheckBox.UseVisualStyleBackColor = true;
         // 
@@ -296,7 +333,7 @@
             0});
         this.mcSquareNumeric.Name = "mcSquareNumeric";
         this.mcSquareNumeric.Size = new System.Drawing.Size(120, 20);
-        this.mcSquareNumeric.TabIndex = 4;
+        this.mcSquareNumeric.TabIndex = 6;
         // 
         // mcHorizVertNumeric
         // 
@@ -308,7 +345,7 @@
             0});
         this.mcHorizVertNumeric.Name = "mcHorizVertNumeric";
         this.mcHorizVertNumeric.Size = new System.Drawing.Size(120, 20);
-        this.mcHorizVertNumeric.TabIndex = 3;
+        this.mcHorizVertNumeric.TabIndex = 5;
         // 
         // label8
         // 
@@ -340,49 +377,69 @@
         // blockTypeVizCheckBox
         // 
         this.blockTypeVizCheckBox.AutoSize = true;
-        this.blockTypeVizCheckBox.Location = new System.Drawing.Point(23, 279);
+        this.blockTypeVizCheckBox.Location = new System.Drawing.Point(22, 340);
         this.blockTypeVizCheckBox.Name = "blockTypeVizCheckBox";
         this.blockTypeVizCheckBox.Size = new System.Drawing.Size(205, 17);
-        this.blockTypeVizCheckBox.TabIndex = 28;
+        this.blockTypeVizCheckBox.TabIndex = 14;
         this.blockTypeVizCheckBox.Text = "Save block type visualization images?";
         this.blockTypeVizCheckBox.UseVisualStyleBackColor = true;
         // 
-        // label9
+        // label10
         // 
-        this.label9.AutoSize = true;
-        this.label9.Location = new System.Drawing.Point(7, 108);
-        this.label9.Name = "label9";
-        this.label9.Size = new System.Drawing.Size(110, 13);
-        this.label9.TabIndex = 6;
-        this.label9.Text = "Intra frame frequency:";
+        this.label10.AutoSize = true;
+        this.label10.Location = new System.Drawing.Point(19, 259);
+        this.label10.Name = "label10";
+        this.label10.Size = new System.Drawing.Size(82, 13);
+        this.label10.TabIndex = 29;
+        this.label10.Text = "Video file name:";
         // 
-        // intraFreqNumeric
+        // videoFileNameTextBox
         // 
-        this.intraFreqNumeric.Location = new System.Drawing.Point(146, 106);
-        this.intraFreqNumeric.Maximum = new decimal(new int[] {
-            100000,
-            0,
-            0,
-            0});
-        this.intraFreqNumeric.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-        this.intraFreqNumeric.Name = "intraFreqNumeric";
-        this.intraFreqNumeric.Size = new System.Drawing.Size(120, 20);
-        this.intraFreqNumeric.TabIndex = 7;
-        this.intraFreqNumeric.Value = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
+        this.videoFileNameTextBox.Location = new System.Drawing.Point(107, 256);
+        this.videoFileNameTextBox.Name = "videoFileNameTextBox";
+        this.videoFileNameTextBox.Size = new System.Drawing.Size(232, 20);
+        this.videoFileNameTextBox.TabIndex = 9;
+        this.videoFileNameTextBox.TextChanged += new System.EventHandler(this.videoFileNameTextBox_TextChanged);
+        // 
+        // videoFileNameOpenButton
+        // 
+        this.videoFileNameOpenButton.Location = new System.Drawing.Point(361, 254);
+        this.videoFileNameOpenButton.Name = "videoFileNameOpenButton";
+        this.videoFileNameOpenButton.Size = new System.Drawing.Size(68, 23);
+        this.videoFileNameOpenButton.TabIndex = 10;
+        this.videoFileNameOpenButton.Text = "Open";
+        this.videoFileNameOpenButton.UseVisualStyleBackColor = true;
+        this.videoFileNameOpenButton.Click += new System.EventHandler(this.videoFileNameOpenButton_Click);
+        // 
+        // videoFileNameSaveButton
+        // 
+        this.videoFileNameSaveButton.Location = new System.Drawing.Point(435, 254);
+        this.videoFileNameSaveButton.Name = "videoFileNameSaveButton";
+        this.videoFileNameSaveButton.Size = new System.Drawing.Size(70, 23);
+        this.videoFileNameSaveButton.TabIndex = 11;
+        this.videoFileNameSaveButton.Text = "Save";
+        this.videoFileNameSaveButton.UseVisualStyleBackColor = true;
+        this.videoFileNameSaveButton.Click += new System.EventHandler(this.videoFileNameSaveButton_Click);
+        // 
+        // label11
+        // 
+        this.label11.AutoSize = true;
+        this.label11.Location = new System.Drawing.Point(19, 411);
+        this.label11.Name = "label11";
+        this.label11.Size = new System.Drawing.Size(51, 13);
+        this.label11.TabIndex = 30;
+        this.label11.Text = "Playback";
         // 
         // Form1
         // 
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(517, 405);
+        this.ClientSize = new System.Drawing.Size(517, 441);
+        this.Controls.Add(this.label11);
+        this.Controls.Add(this.videoFileNameSaveButton);
+        this.Controls.Add(this.videoFileNameOpenButton);
+        this.Controls.Add(this.videoFileNameTextBox);
+        this.Controls.Add(this.label10);
         this.Controls.Add(this.blockTypeVizCheckBox);
         this.Controls.Add(this.groupBox1);
         this.Controls.Add(this.codingStatusLabel);
@@ -408,9 +465,9 @@
         ((System.ComponentModel.ISupportInitialize)(this.numericDuration)).EndInit();
         this.groupBox1.ResumeLayout(false);
         this.groupBox1.PerformLayout();
+        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).EndInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcSquareNumeric)).EndInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcHorizVertNumeric)).EndInit();
-        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).EndInit();
         this.ResumeLayout(false);
         this.PerformLayout();
 
@@ -447,6 +504,11 @@
     private System.Windows.Forms.CheckBox deflateCheckBox;
     private System.Windows.Forms.NumericUpDown intraFreqNumeric;
     private System.Windows.Forms.Label label9;
+    private System.Windows.Forms.Label label10;
+    private System.Windows.Forms.TextBox videoFileNameTextBox;
+    private System.Windows.Forms.Button videoFileNameOpenButton;
+    private System.Windows.Forms.Button videoFileNameSaveButton;
+    private System.Windows.Forms.Label label11;
   }
 }
 

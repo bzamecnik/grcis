@@ -19,11 +19,15 @@ namespace _016videoslow
     {
         protected Bitmap frameImage = null;
 
-        protected string videoFileName = "video.bin";
+        public static readonly string DEFAULT_VIDEO_FILE_NAME = "video.bin";
+        public string VideoFileName { get; set; }
+        
 
         public Form1()
         {
             InitializeComponent();
+            VideoFileName = DEFAULT_VIDEO_FILE_NAME;
+            videoFileNameTextBox.Text = VideoFileName;
             mcHorizVertNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_LINE_SIZE;
             mcSquareNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_SQUARE_SIZE;
             blockTypeVizCheckBox.Checked = VideoCodec.DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
@@ -76,15 +80,6 @@ namespace _016videoslow
 
         private void buttonEncode_Click(object sender, EventArgs e)
         {
-            SaveFileDialog sfd = new SaveFileDialog();
-            sfd.Title = "Save Video File";
-            sfd.Filter = "BIN Files|*.bin";
-            sfd.AddExtension = true;
-            sfd.FileName = videoFileName;
-            if (sfd.ShowDialog() != DialogResult.OK)
-                return;
-            videoFileName = sfd.FileName;
-
             encodingBackgroundWorker.RunWorkerAsync();
         }
 
@@ -96,11 +91,11 @@ namespace _016videoslow
                 return;
             }
 
-            FileStream fs = new FileStream(videoFileName, FileMode.Create);
+            FileStream fs = new FileStream(VideoFileName, FileMode.Create);
             Stream outStream;
 
             StreamWriter log = new StreamWriter(new FileStream("encodelog.txt", FileMode.Create));
-            log.WriteLine("Encoding an image sequence into a compressed video file: " + videoFileName);
+            log.WriteLine("Encoding an image sequence into a compressed video file: " + VideoFileName);
             Stopwatch watch = new Stopwatch();
             watch.Reset();
             watch.Start();
@@ -141,6 +136,10 @@ namespace _016videoslow
             log.WriteLine("Total time: {0} ms. Encoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalEncodingTime, totalEncodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
+            BeginInvoke((Action)delegate
+            {
+                codingStatusLabel.Text += " Done.";
+            });
         }
 
         private VideoCodec GetVideoCodec(StreamWriter log)
@@ -173,7 +172,7 @@ namespace _016videoslow
             string dir = Path.GetDirectoryName(imageFileName);
             Directory.CreateDirectory(dir);
 
-            FileStream fs = new FileStream(videoFileName, FileMode.Open);
+            FileStream fs = new FileStream(VideoFileName, FileMode.Open);
 
             if (fs == null)
             {
@@ -182,7 +181,7 @@ namespace _016videoslow
 
             StreamWriter log = new StreamWriter(new FileStream("decodelog.txt", FileMode.Create));
             VideoCodec codec = GetVideoCodec(log);
-            log.WriteLine("Decoding an image sequence from a compressed video file: " + videoFileName);
+            log.WriteLine("Decoding an image sequence from a compressed video file: " + VideoFileName);
             Stopwatch watch = new Stopwatch();
             watch.Reset();
             watch.Start();
@@ -218,6 +217,10 @@ namespace _016videoslow
             log.WriteLine("Total time: {0} ms. Decoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalDecodingTime, totalDecodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
+            BeginInvoke((Action)delegate
+            {
+                codingStatusLabel.Text += " Done.";
+            });
         }
 
         private void buttonPlay_Click(object sender, EventArgs e)
@@ -232,7 +235,7 @@ namespace _016videoslow
         private void playbackBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             // TODO: handle situation when the video file is not available
-            FileStream fs = new FileStream(videoFileName, FileMode.Open);
+            FileStream fs = new FileStream(VideoFileName, FileMode.Open);
             if (fs == null)
             {
                 return;
@@ -322,6 +325,35 @@ namespace _016videoslow
         private void buttonStop_Click(object sender, EventArgs e)
         {
             StopVideoPlayback();
+        }
+
+        private void videoFileNameOpenButton_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog sfd = new OpenFileDialog();
+            sfd.Title = "Open Video File";
+            sfd.Filter = "BIN Files|*.bin";
+            sfd.AddExtension = true;
+            sfd.FileName = videoFileNameTextBox.Text;
+            if (sfd.ShowDialog() != DialogResult.OK)
+                return;
+            videoFileNameTextBox.Text = sfd.FileName;
+        }
+
+        private void videoFileNameSaveButton_Click(object sender, EventArgs e)
+        {
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.Title = "Save Video File";
+            sfd.Filter = "BIN Files|*.bin";
+            sfd.AddExtension = true;
+            sfd.FileName = videoFileNameTextBox.Text;
+            if (sfd.ShowDialog() != DialogResult.OK)
+                return;
+            videoFileNameTextBox.Text = sfd.FileName;
+        }
+
+        private void videoFileNameTextBox_TextChanged(object sender, EventArgs e)
+        {
+            VideoFileName = videoFileNameTextBox.Text;
         }
     }
 }
