@@ -56,6 +56,9 @@ namespace _016videoslow
         public static readonly int DEFAULT_MC_SEARCH_SQUARE_SIZE = 20;
         public int MCSearchSquareSize { get; set; }
 
+        public static readonly int DEFAULT_INTRA_FRAME_FREQUENCY = 125;
+        public int IntraFrameFrequency { get; set; }
+
         StreamWriter log;
 
         #endregion
@@ -69,6 +72,7 @@ namespace _016videoslow
             MCSearchSquareSize = DEFAULT_MC_SEARCH_SQUARE_SIZE;
             DeflateCompressionEnabled = DEFAULT_DEFLATE_COMPRESSION_ENABLED;
             VisualizeMCBlockTypes = DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
+            IntraFrameFrequency = DEFAULT_INTRA_FRAME_FREQUENCY;
             mcPossibleOffsets = PreparePossibleMotionVectors();
             favouriteMotionVectors = new LinkedList<MotionVector>();
             this.log = log;
@@ -110,7 +114,7 @@ namespace _016videoslow
             int height = inputFrame.Height;
             if ((width != frameWidth) || (height != frameHeight)) return;
 
-            // frame header: [ MAGIC_FRAME, frameIndex ]
+            // frame header: [ MAGIC_FRAME, frameIndex, frameType ]
             outStream.WriteUInt(MAGIC_FRAME);
             outStream.WriteSShort((short)frameIndex);
 
@@ -123,7 +127,7 @@ namespace _016videoslow
 
 
             int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
-            if (frameIndex == 0)
+            if ((frameIndex % IntraFrameFrequency) == 0)
             {
                 EncodeIntraFrame(outStream, inputData, pixelBytes);
             }
@@ -199,13 +203,16 @@ namespace _016videoslow
 
                 int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
 
-                if (frameIndex == 0)
+                // TODO: handle bad value
+                FrameType frameType = (FrameType)inStream.ReadUByte();
+                switch (frameType)
                 {
-                    DecodeIntraFrame(inStream, currentData, pixelBytes);
-                }
-                else
-                {
-                    DecodePredictedFrame(inStream, currentData, previousData, pixelBytes);
+                    case FrameType.Intra:
+                        DecodeIntraFrame(inStream, currentData, pixelBytes);
+                        break;
+                    case FrameType.Predicted:
+                        DecodePredictedFrame(inStream, currentData, previousData, pixelBytes);
+                        break;
                 }
 
                 currentFrame.UnlockBits(currentData);
@@ -237,6 +244,7 @@ namespace _016videoslow
 
         private void EncodeIntraFrame(Stream outStream, BitmapData inputData, int pixelBytes)
         {
+            outStream.WriteByte((byte)FrameType.Intra);
             // TODO:
             // use spatial prediction (similar to PNG)
             unsafe
@@ -258,6 +266,8 @@ namespace _016videoslow
 
         private void EncodePredictedFrame(Stream outStream, BitmapData inputData, BitmapData previousData, int pixelBytes)
         {
+            outStream.WriteByte((byte)FrameType.Predicted);
+
             int xBlocksCount = DivideRoundUp(frameWidth, MCBlockSize);
             int yBlocksCount = DivideRoundUp(frameHeight, MCBlockSize);
 
@@ -453,6 +463,7 @@ namespace _016videoslow
                 {
                     int yStart = yBlock * MCBlockSize;
                     int xStart = xBlock * MCBlockSize;
+                    // TODO: handle bad value
                     MCRecordType mcType = (MCRecordType)inStream.ReadUByte();
                     switch (mcType)
                     {
@@ -650,6 +661,12 @@ namespace _016videoslow
         /// The records contains the full block, ie. values for all pixels.
         /// </summary>
         FullBlock,
+    }
+
+    public enum FrameType
+    {
+        Intra,
+        Predicted,
     }
 
     public struct MotionVector {

@@ -48,24 +48,27 @@
         this.playbackBackgroundWorker = new System.ComponentModel.BackgroundWorker();
         this.buttonStop = new System.Windows.Forms.Button();
         this.groupBox1 = new System.Windows.Forms.GroupBox();
+        this.deflateCheckBox = new System.Windows.Forms.CheckBox();
         this.mcSquareNumeric = new System.Windows.Forms.NumericUpDown();
         this.mcHorizVertNumeric = new System.Windows.Forms.NumericUpDown();
         this.label8 = new System.Windows.Forms.Label();
         this.label7 = new System.Windows.Forms.Label();
         this.label6 = new System.Windows.Forms.Label();
         this.blockTypeVizCheckBox = new System.Windows.Forms.CheckBox();
-        this.deflateCheckBox = new System.Windows.Forms.CheckBox();
+        this.label9 = new System.Windows.Forms.Label();
+        this.intraFreqNumeric = new System.Windows.Forms.NumericUpDown();
         ((System.ComponentModel.ISupportInitialize)(this.numericFps)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.numericDuration)).BeginInit();
         this.groupBox1.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)(this.mcSquareNumeric)).BeginInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcHorizVertNumeric)).BeginInit();
+        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).BeginInit();
         this.SuspendLayout();
         // 
         // buttonDecode
         // 
         this.buttonDecode.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonDecode.Location = new System.Drawing.Point(361, 249);
+        this.buttonDecode.Location = new System.Drawing.Point(361, 294);
         this.buttonDecode.Name = "buttonDecode";
         this.buttonDecode.Size = new System.Drawing.Size(144, 23);
         this.buttonDecode.TabIndex = 5;
@@ -76,7 +79,7 @@
         // buttonEncode
         // 
         this.buttonEncode.Anchor = System.Windows.Forms.AnchorStyles.Right;
-        this.buttonEncode.Location = new System.Drawing.Point(361, 172);
+        this.buttonEncode.Location = new System.Drawing.Point(361, 194);
         this.buttonEncode.Name = "buttonEncode";
         this.buttonEncode.Size = new System.Drawing.Size(144, 23);
         this.buttonEncode.TabIndex = 13;
@@ -94,7 +97,7 @@
         // 
         // textOutputMask
         // 
-        this.textOutputMask.Location = new System.Drawing.Point(95, 227);
+        this.textOutputMask.Location = new System.Drawing.Point(95, 253);
         this.textOutputMask.Name = "textOutputMask";
         this.textOutputMask.Size = new System.Drawing.Size(244, 20);
         this.textOutputMask.TabIndex = 15;
@@ -144,7 +147,7 @@
         // label3
         // 
         this.label3.AutoSize = true;
-        this.label3.Location = new System.Drawing.Point(19, 227);
+        this.label3.Location = new System.Drawing.Point(19, 253);
         this.label3.Name = "label3";
         this.label3.Size = new System.Drawing.Size(70, 13);
         this.label3.TabIndex = 19;
@@ -205,7 +208,7 @@
         // label5
         // 
         this.label5.AutoSize = true;
-        this.label5.Location = new System.Drawing.Point(12, 284);
+        this.label5.Location = new System.Drawing.Point(12, 310);
         this.label5.Name = "label5";
         this.label5.Size = new System.Drawing.Size(40, 13);
         this.label5.TabIndex = 24;
@@ -214,7 +217,7 @@
         // codingStatusLabel
         // 
         this.codingStatusLabel.AutoSize = true;
-        this.codingStatusLabel.Location = new System.Drawing.Point(87, 294);
+        this.codingStatusLabel.Location = new System.Drawing.Point(87, 320);
         this.codingStatusLabel.Name = "codingStatusLabel";
         this.codingStatusLabel.Size = new System.Drawing.Size(0, 13);
         this.codingStatusLabel.TabIndex = 25;
@@ -230,7 +233,7 @@
         // buttonPlay
         // 
         this.buttonPlay.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-        this.buttonPlay.Location = new System.Drawing.Point(195, 318);
+        this.buttonPlay.Location = new System.Drawing.Point(195, 363);
         this.buttonPlay.Name = "buttonPlay";
         this.buttonPlay.Size = new System.Drawing.Size(144, 23);
         this.buttonPlay.TabIndex = 5;
@@ -248,7 +251,7 @@
         // 
         this.buttonStop.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
         this.buttonStop.Enabled = false;
-        this.buttonStop.Location = new System.Drawing.Point(361, 318);
+        this.buttonStop.Location = new System.Drawing.Point(361, 363);
         this.buttonStop.Name = "buttonStop";
         this.buttonStop.Size = new System.Drawing.Size(144, 23);
         this.buttonStop.TabIndex = 5;
@@ -258,6 +261,8 @@
         // 
         // groupBox1
         // 
+        this.groupBox1.Controls.Add(this.intraFreqNumeric);
+        this.groupBox1.Controls.Add(this.label9);
         this.groupBox1.Controls.Add(this.deflateCheckBox);
         this.groupBox1.Controls.Add(this.mcSquareNumeric);
         this.groupBox1.Controls.Add(this.mcHorizVertNumeric);
@@ -266,10 +271,20 @@
         this.groupBox1.Controls.Add(this.label6);
         this.groupBox1.Location = new System.Drawing.Point(13, 101);
         this.groupBox1.Name = "groupBox1";
-        this.groupBox1.Size = new System.Drawing.Size(326, 120);
+        this.groupBox1.Size = new System.Drawing.Size(326, 146);
         this.groupBox1.TabIndex = 26;
         this.groupBox1.TabStop = false;
         this.groupBox1.Text = "Encoding options";
+        // 
+        // deflateCheckBox
+        // 
+        this.deflateCheckBox.AutoSize = true;
+        this.deflateCheckBox.Location = new System.Drawing.Point(10, 88);
+        this.deflateCheckBox.Name = "deflateCheckBox";
+        this.deflateCheckBox.Size = new System.Drawing.Size(164, 17);
+        this.deflateCheckBox.TabIndex = 5;
+        this.deflateCheckBox.Text = "Use DEFLATE compression?";
+        this.deflateCheckBox.UseVisualStyleBackColor = true;
         // 
         // mcSquareNumeric
         // 
@@ -325,28 +340,49 @@
         // blockTypeVizCheckBox
         // 
         this.blockTypeVizCheckBox.AutoSize = true;
-        this.blockTypeVizCheckBox.Location = new System.Drawing.Point(23, 253);
+        this.blockTypeVizCheckBox.Location = new System.Drawing.Point(23, 279);
         this.blockTypeVizCheckBox.Name = "blockTypeVizCheckBox";
         this.blockTypeVizCheckBox.Size = new System.Drawing.Size(205, 17);
         this.blockTypeVizCheckBox.TabIndex = 28;
         this.blockTypeVizCheckBox.Text = "Save block type visualization images?";
         this.blockTypeVizCheckBox.UseVisualStyleBackColor = true;
         // 
-        // deflateCheckBox
+        // label9
         // 
-        this.deflateCheckBox.AutoSize = true;
-        this.deflateCheckBox.Location = new System.Drawing.Point(10, 88);
-        this.deflateCheckBox.Name = "deflateCheckBox";
-        this.deflateCheckBox.Size = new System.Drawing.Size(164, 17);
-        this.deflateCheckBox.TabIndex = 5;
-        this.deflateCheckBox.Text = "Use DEFLATE compression?";
-        this.deflateCheckBox.UseVisualStyleBackColor = true;
+        this.label9.AutoSize = true;
+        this.label9.Location = new System.Drawing.Point(7, 108);
+        this.label9.Name = "label9";
+        this.label9.Size = new System.Drawing.Size(110, 13);
+        this.label9.TabIndex = 6;
+        this.label9.Text = "Intra frame frequency:";
+        // 
+        // intraFreqNumeric
+        // 
+        this.intraFreqNumeric.Location = new System.Drawing.Point(146, 106);
+        this.intraFreqNumeric.Maximum = new decimal(new int[] {
+            100000,
+            0,
+            0,
+            0});
+        this.intraFreqNumeric.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
+        this.intraFreqNumeric.Name = "intraFreqNumeric";
+        this.intraFreqNumeric.Size = new System.Drawing.Size(120, 20);
+        this.intraFreqNumeric.TabIndex = 7;
+        this.intraFreqNumeric.Value = new decimal(new int[] {
+            1,
+            0,
+            0,
+            0});
         // 
         // Form1
         // 
         this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(517, 360);
+        this.ClientSize = new System.Drawing.Size(517, 405);
         this.Controls.Add(this.blockTypeVizCheckBox);
         this.Controls.Add(this.groupBox1);
         this.Controls.Add(this.codingStatusLabel);
@@ -374,6 +410,7 @@
         this.groupBox1.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)(this.mcSquareNumeric)).EndInit();
         ((System.ComponentModel.ISupportInitialize)(this.mcHorizVertNumeric)).EndInit();
+        ((System.ComponentModel.ISupportInitialize)(this.intraFreqNumeric)).EndInit();
         this.ResumeLayout(false);
         this.PerformLayout();
 
@@ -408,6 +445,8 @@
     private System.Windows.Forms.Label label8;
     private System.Windows.Forms.CheckBox blockTypeVizCheckBox;
     private System.Windows.Forms.CheckBox deflateCheckBox;
+    private System.Windows.Forms.NumericUpDown intraFreqNumeric;
+    private System.Windows.Forms.Label label9;
   }
 }
 
