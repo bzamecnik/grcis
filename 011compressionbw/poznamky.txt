@@ -1,0 +1,61 @@
+===== Komprese èernobílého obrázku =====
+
+Zkusit trasovat spojité oblasti - èáry, køivky.
+
+Základní algoritmus:
+- zjistit, která barva je ve vìtšinì (pozadí) a která v menšinì (èáry)
+	- (prùmìr celého obrázku < poèet pixelù) ? pozadí èerné : pozadí bílé
+	- zapsat tuto informaci do výstupu
+- popsat jednotlivé èáry
+	- BÚNO èáry jsou èerné
+	- procházet postupnì pixely
+		- napø. pøedpokládejme, že v bìžném skenovacím poøadí:
+			- pro všechny øádky shora dolù
+				- pro všechny sloupce zleva doprava
+		- vybrat nejbližší èerný pixel
+		- od nìj hledat, popisovat a mazat èáru
+			- postupnì hledat èerný pixel v následujícím okolí
+				- napø. ètyøokolí (vpravo, vpravo dole, dole, vlevo dole)
+			- jakmile máme èerný pixel, víme, kterým smìrem pokraèuje èára
+				- tuto informaci si zapamatujeme
+			- pixel smažeme barvou pozadí
+		- zapsat popis èáry do výstupu
+
+Další úpravy:
+- okolí nezkoumat ve stejném poøadí, ale toto poøadí predikovat
+	- napø. podle poslední volby smìru
+		- to by se mohlo hodit na delší èáry, které vedou jedním smìrem
+
+*- použít 8-okolí
+
+*- místo pozice prvního pixelu èáry uložit jen diferenci vùèi pøedchozí pozici
+
+- pro každou èáru nastavit zvláš potøebný poèet bitù pro smìry
+	- vždy zjistit max. poèet bitù z nejvyššího použitého èísla smìru
+	- rozdìlit cesty na bloky podle nutného poètu bitù
+		- trade-off by se hledat relativnì složitì
+
+- výborné by bylo vùbec nepracovat s byty, ale jen se streamem bitù
+
+- pozice startovních bodù by šlo reprezentovat s variabilním poètem bitù
+	- pro každou pozici poèet bitù zvláš
+		- nutné explicitnì uvádìt poèet bitù
+		- pro malé kladné diference by to mohlo být relativnì výhodné
+	- šlo by použít nejmenší možný poèet bitù podle velikosti obrázku
+		- klidnì i pro každou složku (X,Y) zvláš 
+		- asi mnohem úspornìjší než pro každou pozici zvláš
+
+- pro pozice startovních pixelù vyjídøit explicitnì znaménko a kladnou velikost
+
+==== reprezentace ====
+
+- pro každou cestu zadat:
+	- souøadnice poèátku
+		- dva integery - staèilo by dvoubytové shorty
+	- délka cesty
+		- šlo by omezit délku cesty na 256, aby se vešla do jednoho bytu
+			- poèet cest se dramaticky nezvýší, ale pro každou cestu pak staèí jen jeden byte
+			- vypadá to, že se to chová lépe, než dva byty pro cesty do délky 65536
+	- smìry pro další pixely po cestì
+		- pro ètyøi smìry staèí 2 bity / smìr
+		- pro osm smìrù staèí 3 bity / smìr
