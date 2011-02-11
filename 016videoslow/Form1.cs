@@ -132,6 +132,7 @@ namespace _016videoslow
                 frameImage = (Bitmap)Image.FromFile(imageFileName);
                 lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
             } while (true);
+            frameImage.Dispose();
 
             outStream.Close();
             fs.Close();
@@ -207,6 +208,7 @@ namespace _016videoslow
                 frameIndex++;
             }
             while (true);
+            //frameImage.Dispose();
 
             inStream.Close();
             fs.Close();
@@ -234,7 +236,7 @@ namespace _016videoslow
                 return;
             }
 
-            //StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
+            StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
             VideoCodec codec = GetVideoCodec(null);
 
             Stream inStream = codec.DecodeHeader(fs);
@@ -295,7 +297,7 @@ namespace _016videoslow
 
             inStream.Close();
             fs.Close();
-            //log.Close();
+            log.Close();
         }
 
         private void playbackBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)

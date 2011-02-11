@@ -134,6 +134,7 @@ namespace _016videoslow
 
             inputFrame.UnlockBits(inputData);
             previousFrame.UnlockBits(previousData);
+            previousFrame.Dispose();
 
             previousFrame = inputFrame;
         }
@@ -214,10 +215,12 @@ namespace _016videoslow
                 {
                     debugFrame.UnlockBits(debugFrameData);
                     debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex), ImageFormat.Png);
+                    debugFrame.Dispose();
                 }
             }
-            catch (EndOfStreamException)
+            catch (EndOfStreamException ex)
             {
+                Log("Exception: {0} {1}", ex.Message, ex.StackTrace);
                 return null;
             }
 
@@ -225,6 +228,7 @@ namespace _016videoslow
             // double buffering
             // save the current bitmap to act as previous one when decoding the next frame
             SwapBitmaps(ref previousFrame, ref currentFrame);
+            //currentFrame.Dispose();
 
             return result;
         }
