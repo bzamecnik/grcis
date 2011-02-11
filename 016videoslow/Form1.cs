@@ -28,6 +28,7 @@ namespace _016videoslow
             mcSquareNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_SQUARE_SIZE;
             blockTypeVizCheckBox.Checked = VideoCodec.DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
             deflateCheckBox.Checked = VideoCodec.DEFAULT_DEFLATE_COMPRESSION_ENABLED;
+            intraFreqNumeric.Value = VideoCodec.DEFAULT_INTRA_FRAME_FREQUENCY;
         }
 
         private void buttonCapture_Click(object sender, EventArgs e)
@@ -149,6 +150,7 @@ namespace _016videoslow
             codec.MCSearchSquareSize = (int)mcSquareNumeric.Value;
             codec.VisualizeMCBlockTypes = blockTypeVizCheckBox.Checked;
             codec.DeflateCompressionEnabled = deflateCheckBox.Checked;
+            codec.IntraFrameFrequency = (int)intraFreqNumeric.Value;
             return codec;
         }
 
