@@ -24,6 +24,10 @@ namespace _016videoslow
         public Form1()
         {
             InitializeComponent();
+            mcHorizVertNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_LINE_SIZE;
+            mcSquareNumeric.Value = VideoCodec.DEFAULT_MC_SEARCH_SQUARE_SIZE;
+            blockTypeVizCheckBox.Checked = VideoCodec.DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
+            deflateCheckBox.Checked = VideoCodec.DEFAULT_DEFLATE_COMPRESSION_ENABLED;
         }
 
         private void buttonCapture_Click(object sender, EventArgs e)
@@ -100,42 +104,60 @@ namespace _016videoslow
             watch.Reset();
             watch.Start();
             long lastWatchTime = 0;
+            long totalEncodingTime = 0;
 
             frameImage = (Bitmap)Image.FromFile(imageFileName);
-            lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
 
-            VideoCodec codec = new VideoCodec();
+            VideoCodec codec = GetVideoCodec(log);
             outStream = codec.EncodeHeader(fs, frameImage.Width, frameImage.Height, (float)numericFps.Value, frameImage.PixelFormat);
-            lastWatchTime = LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Encoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
             do
             {
                 codec.EncodeFrame(frameIndex, frameImage, outStream);
-                lastWatchTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
-
-                imageFileName = String.Format(textInputMask.Text, frameIndex + 1);
-                if (!File.Exists(imageFileName)) break;
-                frameImage = (Bitmap)Image.FromFile(imageFileName);
-                lastWatchTime = LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                
+                long framEncTime = LogCurrentStopwatchState("Encoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                totalEncodingTime += framEncTime;
+                lastWatchTime += framEncTime;
+                string labelText = String.Format("Encoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
                 BeginInvoke((Action)delegate
                 {
-                    codingStatusLabel.Text = String.Format("Encoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
+                    codingStatusLabel.Text = labelText;
                 });
+
                 frameIndex++;
+                imageFileName = String.Format(textInputMask.Text, frameIndex);
+                if (!File.Exists(imageFileName)) break;
+                frameImage = (Bitmap)Image.FromFile(imageFileName);
+                lastWatchTime += LogCurrentStopwatchState("Loaded image file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
             } while (true);
+            frameImage.Dispose();
 
             outStream.Close();
             fs.Close();
-            log.WriteLine("Finished encoding the seqence. Total time: {0} ms.", watch.ElapsedMilliseconds);
+            log.WriteLine("Finished encoding the seqence of {0} frames.", frameIndex);
+            log.WriteLine("Total time: {0} ms. Encoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalEncodingTime, totalEncodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
+        }
+
+        private VideoCodec GetVideoCodec(StreamWriter log)
+        {
+            VideoCodec codec = new VideoCodec(log);
+            codec.MCSearchLineSize = (int)mcHorizVertNumeric.Value;
+            codec.MCSearchSquareSize = (int)mcSquareNumeric.Value;
+            codec.VisualizeMCBlockTypes = blockTypeVizCheckBox.Checked;
+            codec.DeflateCompressionEnabled = deflateCheckBox.Checked;
+            return codec;
         }
 
         private static long LogCurrentStopwatchState(string message, StreamWriter log, Stopwatch watch, long lastWatchTime)
         {
             long currentWatchTime = watch.ElapsedMilliseconds;
-            log.WriteLine(message, currentWatchTime - lastWatchTime);
-            return currentWatchTime;
+            long diff = currentWatchTime - lastWatchTime;
+            log.WriteLine(message, diff);
+            return diff;
         }
 
         private void buttonDecode_Click(object sender, EventArgs e)
@@ -156,38 +178,148 @@ namespace _016videoslow
                 return;
             }
 
-            VideoCodec codec = new VideoCodec();
             StreamWriter log = new StreamWriter(new FileStream("decodelog.txt", FileMode.Create));
+            VideoCodec codec = GetVideoCodec(log);
             log.WriteLine("Decoding an image sequence from a compressed video file: " + videoFileName);
             Stopwatch watch = new Stopwatch();
             watch.Reset();
             watch.Start();
             long lastWatchTime = 0;
+            long totalDecodingTime = 0;
 
             Stream inStream = codec.DecodeHeader(fs);
-            lastWatchTime = LogCurrentStopwatchState("Decoded header in {0} ms.", log, watch, lastWatchTime);
+            lastWatchTime += LogCurrentStopwatchState("Decoded header in {0} ms.", log, watch, lastWatchTime);
             int frameIndex = 0;
             do
             {
                 frameImage = codec.DecodeFrame(frameIndex, inStream);
                 if (frameImage == null) break;
-                lastWatchTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
-                imageFileName = String.Format(textOutputMask.Text, frameIndex + 1);
+                long framDecTime = LogCurrentStopwatchState("Decoded frame no. " + frameIndex + " in {0} ms.", log, watch, lastWatchTime);
+                totalDecodingTime += framDecTime;
+                lastWatchTime += framDecTime;
+                imageFileName = String.Format(textOutputMask.Text, frameIndex);
                 frameImage.Save(imageFileName, ImageFormat.Png);
-                lastWatchTime = LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                lastWatchTime += LogCurrentStopwatchState("Saved decoded image into file " + imageFileName + " in {0} ms.", log, watch, lastWatchTime);
+                string labelText = String.Format("Decoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
                 BeginInvoke((Action)delegate
                 {
-                    codingStatusLabel.Text = String.Format("Decoded frames: {0}. Total time: {1} ms.", frameIndex + 1, watch.ElapsedMilliseconds);
+                    codingStatusLabel.Text = labelText;
                 });
                 frameIndex++;
             }
             while (true);
+            //frameImage.Dispose();
 
             inStream.Close();
             fs.Close();
-            log.WriteLine("Finished decoding the seqence. Total time: {0} ms.", watch.ElapsedMilliseconds);
+            log.WriteLine("Finished decoding the seqence of {0} frames.", frameIndex);
+            log.WriteLine("Total time: {0} ms. Decoding time: {1} ms, average {2:f} ms / frame.", watch.ElapsedMilliseconds, totalDecodingTime, totalDecodingTime / (double)frameIndex);
             watch.Stop();
             log.Close();
+        }
+
+        private void buttonPlay_Click(object sender, EventArgs e)
+        {
+            if (!playbackBackgroundWorker.IsBusy)
+            {
+                VideoForm videoForm = new VideoForm();
+                playbackBackgroundWorker.RunWorkerAsync(videoForm);
+            }
+        }
+
+        private void playbackBackgroundWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            // TODO: handle situation when the video file is not available
+            FileStream fs = new FileStream(videoFileName, FileMode.Open);
+            if (fs == null)
+            {
+                return;
+            }
+
+            StreamWriter log = new StreamWriter(new FileStream("playbacklog.txt", FileMode.Create));
+            VideoCodec codec = GetVideoCodec(null);
+
+            Stream inStream = codec.DecodeHeader(fs);
+
+            VideoForm videoForm = (VideoForm)e.Argument;
+            e.Result = videoForm;
+
+            double playbackFPS = (double)numericFps.Value;
+            
+            BeginInvoke((Action)delegate
+            {
+                videoForm.Size = codec.FrameSize;
+                videoForm.PlaybackFPS = playbackFPS;
+                videoForm.Show();
+            });
+            
+            long expectedFrameDuration = (long)(1000.0 / playbackFPS);
+            long lastTime = 0;
+            long lastFPSTime = 0;
+            Stopwatch sw = new Stopwatch();
+            sw.Reset();
+            sw.Start();
+
+            int frameIndex = 0;
+            do
+            {
+                lastTime = sw.ElapsedMilliseconds;
+                frameImage = codec.DecodeFrame(frameIndex, inStream);
+                if (frameImage == null) break;
+
+                long currentTime = sw.ElapsedMilliseconds;
+                long decodingTime = currentTime - lastTime;
+                long sleepTime = expectedFrameDuration - decodingTime;
+
+                if (playbackBackgroundWorker.CancellationPending)
+                {
+                    e.Cancel = true;
+                    break;
+                }
+
+                videoForm.Image = frameImage;
+
+                if ((currentTime - lastFPSTime) > 250)
+                {
+                    videoForm.DecodingFPS = 1000.0 / (double)decodingTime;
+                    lastFPSTime = currentTime;
+                }
+
+                if (sleepTime > 0)
+                {
+                    Thread.Sleep((int)sleepTime);
+                }
+                frameIndex++;
+            }
+            while (!playbackBackgroundWorker.CancellationPending);
+
+            sw.Stop();
+
+            inStream.Close();
+            fs.Close();
+            log.Close();
+        }
+
+        private void playbackBackgroundWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            VideoForm videoForm = (VideoForm)e.Result;
+            BeginInvoke((Action)delegate
+            {
+                videoForm.Hide();
+            });
+        }
+
+        public void StopVideoPlayback()
+        {
+            BeginInvoke((Action)delegate
+            {
+                playbackBackgroundWorker.CancelAsync();
+            });
+        }
+
+        private void buttonStop_Click(object sender, EventArgs e)
+        {
+            StopVideoPlayback();
         }
     }
 }

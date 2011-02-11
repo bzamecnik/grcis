@@ -15,6 +15,8 @@ namespace _016videoslow
     {
         #region protected data
 
+        protected const uint DEFLATE_BUFFER_SIZE = 16384;
+
         protected const uint MAGIC = 0xfe4c128a;
 
         protected const uint MAGIC_FRAME = 0x1212fba1;
@@ -23,17 +25,53 @@ namespace _016videoslow
 
         protected int frameHeight = 0;
 
+        public Size FrameSize {
+            get {
+                return new Size(frameWidth, frameHeight);
+            }
+        }
+
         protected float framesPerSecond = 0.0f;
 
         protected Bitmap currentFrame = null;
         protected Bitmap previousFrame = null;
 
+        public static readonly bool DEFAULT_VISUALIZE_MC_BLOCK_TYPES = false;
+        public bool VisualizeMCBlockTypes { get; set; }
+        protected Bitmap debugFrame = null;
+        protected BitmapData debugFrameData = null;
+
+        public static readonly bool DEFAULT_DEFLATE_COMPRESSION_ENABLED = true;
+        public bool DeflateCompressionEnabled { get; set; }
+
+        // both X and Y size of a motion compensation block
+        public static readonly int DEFAULT_MC_BLOCK_SIZE = 8;
+        public int MCBlockSize { get; set; }
+        protected MotionVector[] mcPossibleOffsets;
+        protected LinkedList<MotionVector> favouriteMotionVectors;
+        protected const int MAX_FAVOURITE_MOTION_VECTORS_SIZE = 3;
+
+        public static readonly int DEFAULT_MC_SEARCH_LINE_SIZE = 64;
+        public int MCSearchLineSize { get; set; }
+        public static readonly int DEFAULT_MC_SEARCH_SQUARE_SIZE = 20;
+        public int MCSearchSquareSize { get; set; }
+
+        StreamWriter log;
+
         #endregion
 
         #region constructor
 
-        public VideoCodec()
+        public VideoCodec(StreamWriter log)
         {
+            MCBlockSize = DEFAULT_MC_BLOCK_SIZE;
+            MCSearchLineSize = DEFAULT_MC_SEARCH_LINE_SIZE;
+            MCSearchSquareSize = DEFAULT_MC_SEARCH_SQUARE_SIZE;
+            DeflateCompressionEnabled = DEFAULT_DEFLATE_COMPRESSION_ENABLED;
+            VisualizeMCBlockTypes = DEFAULT_VISUALIZE_MC_BLOCK_TYPES;
+            mcPossibleOffsets = PreparePossibleMotionVectors();
+            favouriteMotionVectors = new LinkedList<MotionVector>();
+            this.log = log;
         }
 
         #endregion
@@ -44,8 +82,10 @@ namespace _016videoslow
         {
             if (outStream == null) return null;
 
-            DeflateStream ds = new BufferedDeflateStream(16384, outStream, CompressionMode.Compress, true);
-            //Stream ds = outStream;
+            Stream ds = (DeflateCompressionEnabled)
+                ? new BufferedDeflateStream((int)DEFLATE_BUFFER_SIZE, outStream,
+                    CompressionMode.Compress, true)
+                : outStream;
 
             frameWidth = width;
             frameHeight = height;
@@ -54,9 +94,9 @@ namespace _016videoslow
 
             // video header: [ MAGIC, width, height, fps, pixel format ]
             ds.WriteUInt(MAGIC);
-            ds.WriteShort((short)width);
-            ds.WriteShort((short)height);
-            ds.WriteShort((short)(100.0f * fps));
+            ds.WriteSShort((short)width);
+            ds.WriteSShort((short)height);
+            ds.WriteSShort((short)(100.0f * fps));
             ds.WriteUInt((uint)pixelFormat);
 
             return ds;
@@ -72,34 +112,29 @@ namespace _016videoslow
 
             // frame header: [ MAGIC_FRAME, frameIndex ]
             outStream.WriteUInt(MAGIC_FRAME);
-            outStream.WriteShort((short)frameIndex);
+            outStream.WriteSShort((short)frameIndex);
 
-            BitmapData inputData = inputFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, inputFrame.PixelFormat);
-            BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+            BitmapData inputData = inputFrame.LockBits(
+                new Rectangle(0, 0, width, height),
+                ImageLockMode.ReadOnly, inputFrame.PixelFormat);
+            BitmapData previousData = previousFrame.LockBits(
+                new Rectangle(0, 0, width, height),
+                ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
 
             int pixelBytes = GetBytesPerPixel(inputFrame.PixelFormat);
-
-            unsafe
+            if (frameIndex == 0)
             {
-                for (int y = 0; y < frameHeight; y++)
-                {
-                    byte* inputRow = (byte*)inputData.Scan0 + (y * inputData.Stride);
-                    byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
-                    for (int x = 0; x < frameWidth; x++)
-                    {
-                        // assume BGRA pixel format
-                        for (int band = 2; band >= 0; band--)
-                        {
-                            int index = x * pixelBytes + band;
-                            SByte diff = (SByte)(inputRow[index] - previousRow[index]);
-                            outStream.WriteSByte(diff);
-                        }
-                    }
-                }
+                EncodeIntraFrame(outStream, inputData, pixelBytes);
+            }
+            else
+            {
+                EncodePredictedFrame(outStream, inputData, previousData, pixelBytes);
             }
 
             inputFrame.UnlockBits(inputData);
             previousFrame.UnlockBits(previousData);
+            previousFrame.Dispose();
 
             previousFrame = inputFrame;
         }
@@ -108,8 +143,9 @@ namespace _016videoslow
         {
             if (inStream == null) return null;
 
-            DeflateStream ds = new DeflateStream(inStream, CompressionMode.Decompress, true);
-            //Stream ds = inStream;
+            Stream ds = (DeflateCompressionEnabled)
+                ? new DeflateStream(inStream, CompressionMode.Decompress, true)
+                : inStream;
 
             PixelFormat pixelFormat;
 
@@ -118,9 +154,9 @@ namespace _016videoslow
                 // Check the global header:
                 if (ds.ReadUInt() != MAGIC) return null;
 
-                frameWidth = ds.ReadShort();
-                frameHeight = ds.ReadShort();
-                framesPerSecond = ds.ReadShort() * 0.01f;
+                frameWidth = ds.ReadSShort();
+                frameHeight = ds.ReadSShort();
+                framesPerSecond = ds.ReadSShort() * 0.01f;
                 pixelFormat = (PixelFormat)ds.ReadUInt();
             }
             catch (EndOfStreamException)
@@ -143,41 +179,48 @@ namespace _016videoslow
                 // Check the frame header:
                 if (inStream.ReadUInt() != MAGIC_FRAME) return null;
 
-                int encodedFrameIndex = inStream.ReadShort();
+                int encodedFrameIndex = inStream.ReadSShort();
                 if (encodedFrameIndex != frameIndex) return null;
 
-                BitmapData currentData = currentFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, currentFrame.PixelFormat);
-                BitmapData previousData = previousFrame.LockBits(new Rectangle(0, 0, frameWidth, frameHeight), System.Drawing.Imaging.ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+                BitmapData currentData = currentFrame.LockBits(
+                    new Rectangle(0, 0, frameWidth, frameHeight),
+                    ImageLockMode.ReadOnly, currentFrame.PixelFormat);
+                BitmapData previousData = previousFrame.LockBits(
+                    new Rectangle(0, 0, frameWidth, frameHeight),
+                    ImageLockMode.ReadOnly, previousFrame.PixelFormat);
+
+                if (VisualizeMCBlockTypes)
+                {
+                    debugFrame = new Bitmap(frameWidth, frameHeight, PixelFormat.Format24bppRgb);
+                    debugFrameData = debugFrame.LockBits(
+                        new Rectangle(0, 0, frameWidth, frameHeight),
+                        ImageLockMode.ReadOnly, debugFrame.PixelFormat);
+                }
 
                 int pixelBytes = GetBytesPerPixel(currentFrame.PixelFormat);
 
-                unsafe
+                if (frameIndex == 0)
                 {
-                    for (int y = 0; y < frameHeight; y++)
-                    {
-                        byte* currentRow = (byte*)currentData.Scan0 + (y * currentData.Stride);
-                        byte* previousRow = (byte*)previousData.Scan0 + (y * previousData.Stride);
-                        for (int x = 0; x < frameWidth; x++)
-                        {
-                            // BGRA
-                            for (int band = 2; band >= 0; band--)
-                            {
-                                SByte diff = inStream.ReadSByte();
-                                int index = x * pixelBytes + band;
-                                currentRow[index] = (byte)(previousRow[index] + diff);
-                            }
-                            if (pixelBytes == 4)
-                            {
-                                currentRow[x * pixelBytes + 3] = 255; // assume full alpha
-                            }
-                        }
-                    }
+                    DecodeIntraFrame(inStream, currentData, pixelBytes);
                 }
+                else
+                {
+                    DecodePredictedFrame(inStream, currentData, previousData, pixelBytes);
+                }
+
                 currentFrame.UnlockBits(currentData);
                 previousFrame.UnlockBits(previousData);
+
+                if (VisualizeMCBlockTypes)
+                {
+                    debugFrame.UnlockBits(debugFrameData);
+                    debugFrame.Save(String.Format("debug{0:000000}.png", frameIndex), ImageFormat.Png);
+                    debugFrame.Dispose();
+                }
             }
-            catch (EndOfStreamException)
+            catch (EndOfStreamException ex)
             {
+                Log("Exception: {0} {1}", ex.Message, ex.StackTrace);
                 return null;
             }
 
@@ -185,8 +228,344 @@ namespace _016videoslow
             // double buffering
             // save the current bitmap to act as previous one when decoding the next frame
             SwapBitmaps(ref previousFrame, ref currentFrame);
+            //currentFrame.Dispose();
 
             return result;
+        }
+
+        #endregion
+
+        private void EncodeIntraFrame(Stream outStream, BitmapData inputData, int pixelBytes)
+        {
+            // TODO:
+            // use spatial prediction (similar to PNG)
+            unsafe
+            {
+                for (int y = 0; y < frameHeight; y++)
+                {
+                    byte* inputRow = (byte*)inputData.Scan0 + (y * inputData.Stride);
+                    for (int x = 0; x < frameWidth; x++)
+                    {
+                        // assume BGRA pixel format
+                        for (int band = 2; band >= 0; band--)
+                        {
+                            outStream.WriteByte(inputRow[x * pixelBytes + band]);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void EncodePredictedFrame(Stream outStream, BitmapData inputData, BitmapData previousData, int pixelBytes)
+        {
+            int xBlocksCount = DivideRoundUp(frameWidth, MCBlockSize);
+            int yBlocksCount = DivideRoundUp(frameHeight, MCBlockSize);
+
+            int identicalBlocksCount = 0;
+            int translatedBlocksCount = 0;
+            int fullBlocksCount = 0;
+
+            for (int yBlock = 0; yBlock < yBlocksCount; yBlock++)
+            {
+                for (int xBlock = 0; xBlock < xBlocksCount; xBlock++)
+                {
+                    // absolute position of the block start
+                    int yStart = yBlock * MCBlockSize;
+                    int xStart = xBlock * MCBlockSize;
+
+                    MotionVector motionVector;
+                    bool motionVectorFound = SearchMotionVector(inputData,
+                        previousData, pixelBytes, yStart, xStart, out motionVector);
+
+                    if (motionVectorFound)
+                    {
+                        if ((motionVector.x == 0) && (motionVector.y == 0))
+                        {
+                            outStream.WriteByte((byte)MCRecordType.Identical);
+                            identicalBlocksCount++;
+                        }
+                        else
+                        {
+                            // store a record type being a motion vector
+                            outStream.WriteByte((byte)MCRecordType.MotionVector);
+                            // store the motion vector itself
+                            // TODO: store only a difference to the previous motion vector
+                            // TODO: it could be possible to store only an index to the vector of
+                            // possible motion vectors
+                            outStream.WriteSShort(motionVector.x);
+                            outStream.WriteSShort(motionVector.y);
+                            translatedBlocksCount++;
+                        }
+                    }
+                    else
+                    {
+                        // store a record type being a full block
+                        outStream.WriteByte((byte)MCRecordType.FullBlock);
+                        // store the full block contents
+                        EncodeFullBlock(outStream, inputData, previousData, pixelBytes, yStart, xStart);
+                        fullBlocksCount++;
+                    }
+                }
+            }
+            Log("Block counts - identical: {0}, translated: {1}, full: {2}", identicalBlocksCount, translatedBlocksCount, fullBlocksCount);
+        }
+
+        unsafe private bool SearchMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, out MotionVector motionVector)
+        {
+            byte* inputPtr = (byte*)inputData.Scan0;
+            byte* previousPtr = (byte*)previousData.Scan0;
+
+            motionVector = MotionVector.ZERO;
+            // Origin - no translation. This is most probable.
+            if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, MotionVector.ZERO))
+            {
+                return true;
+            }
+
+            foreach (MotionVector favouriteVector in favouriteMotionVectors)
+            {
+                if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, favouriteVector))
+                {
+                    motionVector = favouriteVector;
+                    return true;
+                }
+            }
+
+            // check possible offsets to find an equal shifted
+            // block in the previous frame
+            for (int i = 0; i < mcPossibleOffsets.Length; i++)
+            {
+                motionVector = mcPossibleOffsets[i];
+                if (TestMotionVector(inputData, previousData, pixelBytes, yStart, xStart, inputPtr, previousPtr, motionVector))
+                {
+                    if (!favouriteMotionVectors.Contains(motionVector))
+                    {
+                        favouriteMotionVectors.AddFirst(motionVector);
+                        if (favouriteMotionVectors.Count > MAX_FAVOURITE_MOTION_VECTORS_SIZE)
+                        {
+                            favouriteMotionVectors.RemoveLast();
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        unsafe private bool TestMotionVector(BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart, byte* inputPtr, byte* previousPtr, MotionVector motionVector)
+        {
+            for (int y = yStart; y < yStart + MCBlockSize; y++)
+            {
+                byte* inputRow = inputPtr + (y * inputData.Stride);
+                byte* previousRow = previousPtr + (y * previousData.Stride);
+                for (int x = xStart; x < xStart + MCBlockSize; x++)
+                {
+                    int xSource = x + motionVector.x;
+                    int ySource = y + motionVector.y;
+                    if ((x < 0) || (x >= frameWidth) ||
+                        (y < 0) || (y >= frameHeight) ||
+                        (xSource < 0) || (xSource >= frameWidth) ||
+                        (ySource < 0) || (ySource >= frameHeight))
+                    {
+                        return false;
+                    }
+                    // assume BGRA pixel format
+                    for (int band = 0; band < 3; band++)
+                    {
+                        int inputIndex = x * pixelBytes + band;
+                        int previousIndex = motionVector.y * previousData.Stride + xSource * pixelBytes + band;
+                        if (inputRow[inputIndex] != previousRow[previousIndex])
+                        {
+                            // means: inputFrame[x, y] != previousFrame[xSource, ySource])
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        unsafe private void EncodeFullBlock(Stream outStream, BitmapData inputData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
+        {
+            byte* inputPtr = (byte*)inputData.Scan0;
+            byte* previousPtr = (byte*)previousData.Scan0;
+            int yMax = Math.Min(yStart + MCBlockSize, frameHeight);
+            int xMax = Math.Min(xStart + MCBlockSize, frameWidth);
+            for (int y = yStart; y < yMax; y++)
+            {
+                byte* inputRow = inputPtr + (y * inputData.Stride);
+                byte* previousRow = previousPtr + (y * previousData.Stride);
+                for (int x = xStart; x < xMax; x++)
+                {
+                    // store (inputFrame[x, y] - previousFrame[x, y])
+                    // assume BGRA input pixel format, store as RGB
+                    for (int band = 2; band >= 0; band--)
+                    {
+                        // temporal prediction
+                        int index = x * pixelBytes + band;
+                        byte diff = (byte)(inputRow[index] - previousRow[index]);
+                        outStream.WriteByte(diff);
+                    }
+                }
+            }
+        }
+
+        private int DivideRoundUp(int numerator, int denominator)
+        {
+            return (numerator / denominator) + ((numerator % denominator > 0) ? 1 : 0);
+        }
+
+        private void DecodeIntraFrame(Stream inStream, BitmapData currentData, int pixelBytes)
+        {
+            // TODO:
+            // use spatial prediction (similar to PNG)
+            unsafe
+            {
+                for (int y = 0; y < frameHeight; y++)
+                {
+                    byte* currentRow = (byte*)currentData.Scan0 + (y * currentData.Stride);
+                    for (int x = 0; x < frameWidth; x++)
+                    {
+                        // assume BGRA pixel format
+                        for (int band = 2; band >= 0; band--)
+                        {
+                            currentRow[x * pixelBytes + band] = inStream.ReadUByte();
+                        }
+                        if (pixelBytes == 4)
+                        {
+                            currentRow[x * pixelBytes + 3] = 255; // assume full alpha 
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DecodePredictedFrame(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes)
+        {
+            int xBlocksCount = DivideRoundUp(frameWidth, MCBlockSize);
+            int yBlocksCount = DivideRoundUp(frameHeight, MCBlockSize);
+
+            MotionVector motionVector = MotionVector.ZERO;
+
+            for (int yBlock = 0; yBlock < yBlocksCount; yBlock++)
+            {
+                for (int xBlock = 0; xBlock < xBlocksCount; xBlock++)
+                {
+                    int yStart = yBlock * MCBlockSize;
+                    int xStart = xBlock * MCBlockSize;
+                    MCRecordType mcType = (MCRecordType)inStream.ReadUByte();
+                    switch (mcType)
+                    {
+                        case MCRecordType.Identical:
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, MotionVector.ZERO);
+                            break;
+                        case MCRecordType.MotionVector:
+                            motionVector.x = inStream.ReadSShort();
+                            motionVector.y = inStream.ReadSShort();
+
+                            DecodeTranslatedBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart, motionVector);
+                            break;
+                        case MCRecordType.FullBlock:
+                            DecodeFullBlock(inStream, currentData, previousData, pixelBytes, yStart, xStart);
+                            break;
+                    }
+                }
+            }
+        }
+
+        unsafe private void DecodeFullBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart)
+        {
+            byte* currentPtr = (byte*)currentData.Scan0;
+            byte* previousPtr = (byte*)previousData.Scan0;
+            int debugPixelBytes = pixelBytes;
+            if (VisualizeMCBlockTypes)
+            {
+                debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
+            }
+            int yMax = Math.Min(yStart + MCBlockSize, frameHeight);
+            int xMax = Math.Min(xStart + MCBlockSize, frameWidth);
+
+            for (int y = yStart; y < yMax; y++)
+            {
+                byte* currentRow = currentPtr + (y * currentData.Stride);
+                byte* previousRow = previousPtr + (y * previousData.Stride);
+                byte* debugRow = (byte*)0;
+                if (VisualizeMCBlockTypes)
+                {
+                    debugRow = (byte*)debugFrameData.Scan0 + (y * debugFrameData.Stride);
+                }
+                for (int x = xStart; x < xMax; x++)
+                {
+                    // assume BGRA input pixel format, store as RGB
+                    for (int band = 2; band >= 0; band--)
+                    {
+                        // temporal prediction
+                        byte diff = inStream.ReadUByte();
+                        int index = x * pixelBytes + band;
+                        currentRow[index] = (byte)(previousRow[index] + diff);
+                    }
+                    if (pixelBytes == 4)
+                    {
+                        currentRow[x * pixelBytes + 3] = 255; // assume full alpha 
+                    }
+
+                    if (VisualizeMCBlockTypes)
+                    {
+                        int index = x * debugPixelBytes;
+                        debugRow[index] = 0;
+                        debugRow[index + 1] = 0;
+                        debugRow[index + 2] = 255; // red
+                    }
+                }
+            }
+        }
+
+        unsafe private void DecodeTranslatedBlock(Stream inStream, BitmapData currentData, BitmapData previousData, int pixelBytes, int yStart, int xStart, MotionVector motionVector)
+        {
+            byte* currentPtr = (byte*)currentData.Scan0;
+            byte* previousPtr = (byte*)previousData.Scan0;
+            int debugPixelBytes = pixelBytes;
+            if (VisualizeMCBlockTypes)
+            {
+                debugPixelBytes = GetBytesPerPixel(debugFrame.PixelFormat);
+            }
+
+            bool isIdenticalBlock = (motionVector.x == 0) && (motionVector.y == 0);
+
+            for (int y = yStart; y < yStart + MCBlockSize; y++)
+            {
+                byte* currentRow = currentPtr + (y * currentData.Stride);
+                byte* previousRow = previousPtr + ((y + motionVector.y) * previousData.Stride);
+                byte* debugRow = (byte*)0;
+                if (VisualizeMCBlockTypes)
+                {
+                    debugRow = (byte*)debugFrameData.Scan0 + (y * debugFrameData.Stride);
+                }
+                for (int x = xStart; x < xStart + MCBlockSize; x++)
+                {
+                    // assume BGRA input pixel format, store as RGB
+                    for (int band = 2; band >= 0; band--)
+                    {
+                        // temporal prediction
+                        int currentIndex = x * pixelBytes + band;
+                        int previousIndex = currentIndex + motionVector.x * pixelBytes;
+                        currentRow[currentIndex] = previousRow[previousIndex];
+                    }
+                    if (pixelBytes == 4)
+                    {
+                        currentRow[x * pixelBytes + 3] = 255; // assume full alpha 
+                    }
+                    if (VisualizeMCBlockTypes)
+                    {
+                        // identical - green
+                        // translated - blue
+                        int index = x * debugPixelBytes;
+                        debugRow[index] = (byte)((isIdenticalBlock) ? 0 : 255);
+                        debugRow[index + 1] = (byte)((isIdenticalBlock) ? 255 : 0);
+                        debugRow[index + 2] = 0;
+                    }
+                }
+            }
         }
 
         private void SwapBitmaps(ref Bitmap previousFrame, ref Bitmap currentFrame)
@@ -207,8 +586,88 @@ namespace _016videoslow
             }
         }
 
-        #endregion
+        private MotionVector[] PreparePossibleMotionVectors()
+        {
+            List<MotionVector> vectors = new List<MotionVector>();
+            // Add offsets for vertical and horizontal translation.
+            // This is very probable.
+            for (short i = 1; i < MCSearchLineSize; i++)
+            {
+                vectors.Add(new MotionVector(0, i));
+                vectors.Add(new MotionVector(0, (short)-i));
+            }
+            for (short i = 1; i < MCSearchLineSize; i++)
+            {
+                vectors.Add(new MotionVector(i, 0));
+                vectors.Add(new MotionVector((short)-i, 0));
+            }
+            // Add offsets for exhaustive search in remaining positions
+            // within a defined square (possible smaller than the V and H directions).
+            // This is less probable.
+            for (short i = 1; i < MCSearchSquareSize; i++)
+            {
+                for (short j = 1; j < MCSearchSquareSize; j++)
+                {
+                    // right down quadrant
+                    vectors.Add(new MotionVector(i, j));
+                    // right up quadrant
+                    vectors.Add(new MotionVector(i, (short)-j));
+                    // left up quadrant
+                    vectors.Add(new MotionVector((short)-i, j));
+                    // left down quadrant
+                    vectors.Add(new MotionVector((short)-i, (short)-j));
+                }
+            }
+            return vectors.ToArray();
+        }
 
+        private void Log(String message, params object[] parameters)
+        {
+            if (log != null)
+            {
+                log.WriteLine(String.Format(message, parameters));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Type of a motion compensation block record.
+    /// </summary>
+    public enum MCRecordType
+    {
+        /// <summary>
+        /// The motion vector is [0, 0], ie. the block is identical to the
+        /// block in the previous frame and there is no offset needed to be
+        /// stored.
+        /// </summary>
+        Identical,
+        /// <summary>
+        /// The record contains only a motion vector, ie. offset of an identical
+        /// block found in a previous frame.
+        /// </summary>
+        MotionVector,
+        /// <summary>
+        /// The records contains the full block, ie. values for all pixels.
+        /// </summary>
+        FullBlock,
+    }
+
+    public struct MotionVector {
+        public short x;
+        public short y;
+
+        public static readonly MotionVector ZERO = new MotionVector(0, 0);
+
+        public MotionVector(short x, short y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("[{0}, {1}]", x, y);
+        }
     }
 
     public class EndOfStreamException : System.Exception, ISerializable
@@ -236,7 +695,7 @@ namespace _016videoslow
 
     public static class Extensions
     {
-        public static void WriteShort(this Stream outs, short number)
+        public static void WriteSShort(this Stream outs, short number)
         {
             outs.WriteByte((byte)((number >> 8) & 0xff));
             outs.WriteByte((byte)(number & 0xff));
@@ -259,7 +718,7 @@ namespace _016videoslow
             outs.WriteByte((byte)(number & 0xff));
         }
 
-        public static byte ReadByte(this Stream inputStream)
+        public static byte ReadUByte(this Stream inputStream)
         {
             int number = inputStream.ReadByte();
             if (number < 0) throw new EndOfStreamException();
@@ -275,7 +734,7 @@ namespace _016videoslow
             return (SByte)(((SByte)sign) * ((byte)number));
         }
 
-        public static short ReadShort(this Stream inputStream)
+        public static short ReadSShort(this Stream inputStream)
         {
             int number = 0;
             for (int i = 0; i < 2; i++)
@@ -298,16 +757,5 @@ namespace _016videoslow
             }
             return number;
         }
-
-        public static Color plus(this Color color, Color another)
-        {
-            return Color.FromArgb(color.R + another.R, color.G + another.G, color.B + another.B);
-        }
-
-        public static Color minus(this Color color, Color another)
-        {
-            return Color.FromArgb(color.R - another.R, color.G - another.G, color.B - another.B);
-        }
     }
-
 }
