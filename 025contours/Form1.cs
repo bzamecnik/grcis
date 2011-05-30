@@ -66,11 +66,12 @@ namespace _025contours
                  outputImage.Height != height)
                 outputImage = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
 
-            using (Graphics g = Graphics.FromImage(outputImage))
-            {
-                g.FillRectangle(Brushes.White, 0, 0, width, height);
-                g.Flush();
-            }
+            //// fill image to white - only useful if we're not drawing the function itself
+            //using (Graphics g = Graphics.FromImage(outputImage))
+            //{
+            //    g.FillRectangle(Brushes.White, 0, 0, width, height);
+            //    g.Flush();
+            //}
 
             Stopwatch sw = new Stopwatch();
             sw.Start();

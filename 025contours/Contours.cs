@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.Linq;
 using System.Windows.Forms;
 using Raster;
-using System.Linq;
 
 namespace _025contours
 {
@@ -49,57 +50,58 @@ namespace _025contours
             // size of one pixel at the target scale
             double pixelSize = scale;
 
-            for (int y = 0; y < height; y++)
+            BitmapData data = image.LockBits(new Rectangle(0, 0, width, height),
+                System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                PixelFormat.Format24bppRgb);
+
+            double[] values = new double[4];
+            double[] thresholds = thr.ToArray();
+
+            unsafe
             {
-                double dy = (y - origin.Y) * scale;
-                for (int x = 0; x < width; x++)
+                for (int y = 0; y < height; y++)
                 {
-                    double dx = (x - origin.X) * scale;
-
-                    bool isIsoLine = PixelSideCenterCondition(dx, dy, pixelSize);
-
-                    Color color;
-                    if (isIsoLine)
+                    byte* row = (byte*)data.Scan0 + y * data.Stride;
+                    double dy = (y - origin.Y) * scale;
+                    for (int x = 0; x < width; x++)
                     {
-                        color = Color.Black;
+                        double dx = (x - origin.X) * scale;
+
+                        values[0] = f(dx + 0.5 * pixelSize, dy) + valueDrift;
+                        values[1] = f(dx, dy + 0.5 * pixelSize) + valueDrift;
+                        values[2] = f(dx + pixelSize, dy + 0.5 * pixelSize) + valueDrift;
+                        values[3] = f(dx + 0.5 * pixelSize, dy + pixelSize) + valueDrift;
+                        double minValue = values.Min();
+                        double maxValue = values.Max();
+
+                        bool isIsoLine = false;
+                        foreach (double threshold in thresholds)
+                        {
+                            isIsoLine = (minValue < threshold) && (maxValue >= threshold);
+                            if (isIsoLine)
+                            {
+                                break;
+                            }
+                        }
+
+                        Color color;
+                        if (isIsoLine)
+                        {
+                            color = Color.Black;
+                        }
+                        else
+                        {
+                            double value = f(dx, dy) + valueDrift;
+                            color = Draw.ColorRamp(value * 0.1 + 0.5);
+                        }
+                        int colorArgb = color.ToArgb();
+                        row[x * 3] = (byte)(colorArgb & 0xff); // B
+                        row[x * 3 + 1] = (byte)((colorArgb >> 8) & 0xff); // G
+                        row[x * 3 + 2] = (byte)((colorArgb >> 16) & 0xff); // R
                     }
-                    else
-                    {
-                        double value = f(dx, dy) + valueDrift;
-                        color = Draw.ColorRamp(value * 0.1 + 0.5);
-                    }
-                    image.SetPixel(x, y, color);
                 }
+                image.UnlockBits(data);
             }
-        }
-
-        private bool PixelCornerCondition(double x, double y, double pixelSize)
-        {
-            double[] values = { f(x, y), f(x, y + pixelSize), f(x + pixelSize, y), f(x + pixelSize, y + pixelSize) };
-            for (int i = 0; i < values.Length; i++)
-            {
-                values[i] += valueDrift;
-            }
-            double threshold = 0.0;
-            return (values.Min() < threshold) && (values.Max() >= threshold);
-        }
-
-        private bool PixelSideCenterCondition(double x, double y, double pixelSize)
-        {
-            double halfPixel = 0.5 * pixelSize;
-            double[] values =
-            {
-                f(x + halfPixel, y),
-                f(x, y + halfPixel),
-                f(x + pixelSize, y + halfPixel),
-                f(x + halfPixel, y + pixelSize)
-            };
-            for (int i = 0; i < values.Length; i++)
-            {
-                values[i] += valueDrift;
-            }
-            double threshold = 0.0;
-            return (values.Min() < threshold) && (values.Max() >= threshold);
         }
 
         protected void DrawOriginalFunction(Bitmap image)
