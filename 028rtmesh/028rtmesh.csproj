@@ -5,11 +5,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>9.0.30729</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{565CDBB3-F270-4B8E-B9DB-00C11C770BAE}</ProjectGuid>
+    <ProjectGuid>{69242D1F-586F-4D76-ABB0-343F95FBC2BD}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>_018raycasting</RootNamespace>
-    <AssemblyName>018raycasting</AssemblyName>
+    <RootNamespace>_028rtmesh</RootNamespace>
+    <AssemblyName>028rtmesh</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -69,6 +69,15 @@
     <Compile Include="..\common\RayCastingScene.cs">
       <Link>RayCastingScene.cs</Link>
     </Compile>
+    <Compile Include="..\common\RayTracingRender.cs">
+      <Link>RayTracingRender.cs</Link>
+    </Compile>
+    <Compile Include="..\common\Scene.cs">
+      <Link>Scene.cs</Link>
+    </Compile>
+    <Compile Include="..\common\WavefrontObj.cs">
+      <Link>WavefrontObj.cs</Link>
+    </Compile>
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -79,7 +88,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
-      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -99,12 +107,12 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="RayCasting.cs">
+    <Compile Include="RtMesh.cs">
       <SubType>Form</SubType>
     </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>

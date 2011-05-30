@@ -1,4 +1,4 @@
-﻿namespace _018raycasting
+﻿namespace _025contours
 {
   partial class Form1
   {
@@ -34,6 +34,9 @@
       this.buttonRedraw = new System.Windows.Forms.Button();
       this.labelElapsed = new System.Windows.Forms.Label();
       this.labelSample = new System.Windows.Forms.Label();
+      this.comboFunction = new System.Windows.Forms.ComboBox();
+      this.label1 = new System.Windows.Forms.Label();
+      this.buttonReset = new System.Windows.Forms.Button();
       this.panel1.SuspendLayout();
       ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
       this.SuspendLayout();
@@ -61,6 +64,7 @@
       this.pictureBox1.TabStop = false;
       this.pictureBox1.MouseMove += new System.Windows.Forms.MouseEventHandler( this.pictureBox1_MouseMove );
       this.pictureBox1.MouseDown += new System.Windows.Forms.MouseEventHandler( this.pictureBox1_MouseDown );
+      this.pictureBox1.MouseUp += new System.Windows.Forms.MouseEventHandler( this.pictureBox1_MouseUp );
       // 
       // buttonSave
       // 
@@ -104,11 +108,45 @@
       this.labelSample.TabIndex = 22;
       this.labelSample.Text = "Sample:";
       // 
+      // comboFunction
+      // 
+      this.comboFunction.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+      this.comboFunction.FormattingEnabled = true;
+      this.comboFunction.Location = new System.Drawing.Point( 74, 376 );
+      this.comboFunction.Name = "comboFunction";
+      this.comboFunction.Size = new System.Drawing.Size( 161, 21 );
+      this.comboFunction.TabIndex = 23;
+      this.comboFunction.SelectedIndexChanged += new System.EventHandler( this.comboFunction_SelectedIndexChanged );
+      // 
+      // label1
+      // 
+      this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+      this.label1.AutoSize = true;
+      this.label1.Location = new System.Drawing.Point( 12, 381 );
+      this.label1.Name = "label1";
+      this.label1.Size = new System.Drawing.Size( 51, 13 );
+      this.label1.TabIndex = 24;
+      this.label1.Text = "Function:";
+      // 
+      // buttonReset
+      // 
+      this.buttonReset.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+      this.buttonReset.Location = new System.Drawing.Point( 269, 376 );
+      this.buttonReset.Name = "buttonReset";
+      this.buttonReset.Size = new System.Drawing.Size( 116, 23 );
+      this.buttonReset.TabIndex = 25;
+      this.buttonReset.Text = "Reset scale";
+      this.buttonReset.UseVisualStyleBackColor = true;
+      this.buttonReset.Click += new System.EventHandler( this.buttonReset_Click );
+      // 
       // Form1
       // 
       this.AutoScaleDimensions = new System.Drawing.SizeF( 6F, 13F );
       this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
       this.ClientSize = new System.Drawing.Size( 712, 446 );
+      this.Controls.Add( this.buttonReset );
+      this.Controls.Add( this.label1 );
+      this.Controls.Add( this.comboFunction );
       this.Controls.Add( this.labelSample );
       this.Controls.Add( this.labelElapsed );
       this.Controls.Add( this.buttonRedraw );
@@ -116,7 +154,7 @@
       this.Controls.Add( this.panel1 );
       this.MinimumSize = new System.Drawing.Size( 660, 200 );
       this.Name = "Form1";
-      this.Text = "018 ray-casting";
+      this.Text = "025 contours";
       this.panel1.ResumeLayout( false );
       this.panel1.PerformLayout();
       ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
@@ -133,6 +171,9 @@
     private System.Windows.Forms.Button buttonRedraw;
     private System.Windows.Forms.Label labelElapsed;
     private System.Windows.Forms.Label labelSample;
+    private System.Windows.Forms.ComboBox comboFunction;
+    private System.Windows.Forms.Label label1;
+    private System.Windows.Forms.Button buttonReset;
   }
 }
 

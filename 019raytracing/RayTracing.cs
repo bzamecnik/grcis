@@ -3,7 +3,7 @@ using System.Windows.Forms;
 using OpenTK;
 using Rendering;
 
-namespace _018raycasting
+namespace _019raytracing
 {
   public partial class Form1 : Form
   {
@@ -14,7 +14,7 @@ namespace _018raycasting
     {
       // default constructor of the RayScene .. custom scene
       scene = new RayScene();
-      return new RayCasting( scene );
+      return new RayTracing( scene );
     }
 
     /// <summary>
@@ -117,7 +117,7 @@ namespace Rendering
     { }
 
     /// <summary>
-    /// Computes the complete intersection of the given ray with the object.
+    /// Computes the complete intersection of the given ray with the object. 
     /// </summary>
     /// <param name="p0">Ray origin.</param>
     /// <param name="p1">Ray direction vector.</param>

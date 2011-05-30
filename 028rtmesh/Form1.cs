@@ -3,8 +3,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using Rendering;
+using Scene3D;
+using System.IO;
 
-namespace _018raycasting
+namespace _028rtmesh
 {
   public partial class Form1 : Form
   {
@@ -27,6 +29,11 @@ namespace _018raycasting
     /// Image synthesizer used to compute raster images.
     /// </summary>
     protected IRenderer rend = null;
+
+    /// <summary>
+    /// B-rep scene read from the .OBJ file.
+    /// </summary>
+    protected SceneBrep brepScene = new SceneBrep();
 
     /// <summary>
     /// Redraws the whole image.
@@ -115,6 +122,30 @@ namespace _018raycasting
     {
       if ( e.Button == MouseButtons.Left )
         singleSample( e.X, e.Y );
+    }
+
+    private void buttonLoad_Click ( object sender, EventArgs e )
+    {
+      OpenFileDialog ofd = new OpenFileDialog();
+
+      ofd.Title = "Open Scene File";
+      ofd.Filter = "Wavefront OBJ Files|*.obj" +
+          "|All scene types|*.obj";
+
+      ofd.FilterIndex = 1;
+      ofd.FileName = "";
+      if ( ofd.ShowDialog() != DialogResult.OK )
+        return;
+
+      WavefrontObj objReader = new WavefrontObj();
+      objReader.MirrorConversion = false;
+      StreamReader reader = new StreamReader( new FileStream( ofd.FileName, FileMode.Open ) );
+      int faces = objReader.ReadBrep( reader, brepScene );
+      reader.Close();
+      brepScene.BuildCornerTable();
+      labelSample.Text = String.Format( "{0} faces", faces );
+
+      imf = null;  // reset the scene object (to be sure)
     }
   }
 }

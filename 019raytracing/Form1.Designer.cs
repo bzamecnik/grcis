@@ -1,4 +1,4 @@
-﻿namespace _018raycasting
+﻿namespace _019raytracing
 {
   partial class Form1
   {
@@ -116,7 +116,7 @@
       this.Controls.Add( this.panel1 );
       this.MinimumSize = new System.Drawing.Size( 660, 200 );
       this.Name = "Form1";
-      this.Text = "018 ray-casting";
+      this.Text = "019 ray-tracing";
       this.panel1.ResumeLayout( false );
       this.panel1.PerformLayout();
       ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
