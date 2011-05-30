@@ -42,12 +42,21 @@ bool isIsoContour(vec2 coord) {
 		minValue = min(minValue, sideCenterValues[i]);
 		maxValue = max(maxValue, sideCenterValues[i]);
 	}
-	for (float threshold = -10.0; threshold <= 10.0; threshold += 0.5) {
-		if ((minValue < threshold) && (maxValue >= threshold)) {
-			return true;
-		}
+	bool isContour = false;
+	// threshold generated on the fly (uniformly separated)
+	float thresholdMin = -4;
+	float thresholdMax = 4;
+	int thresholdCount = 50;
+	float thresholdStep = (thresholdMax - thresholdMin) / (float)thresholdCount;
+	float threshold = thresholdMin;
+	for (int i = 0; i < thresholdCount; i++) {
+		threshold += thresholdStep;
+		// It is better not to break early as we know there is an isocontour.
+		// Conditional execution slows the shader more the a few unnecessary
+		// comparisons.
+		isContour = isContour || ((minValue < threshold) && (maxValue >= threshold));
 	}
-	return false;
+	return isContour;
 }
 
 void main() {
