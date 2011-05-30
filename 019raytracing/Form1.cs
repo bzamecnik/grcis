@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Rendering;
 
-namespace _018raycasting
+namespace _019raytracing
 {
   public partial class Form1 : Form
   {
