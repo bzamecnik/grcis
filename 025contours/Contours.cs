@@ -75,14 +75,15 @@ namespace _025contours
                         double maxValue = values.Max();
 
                         bool isIsoLine = false;
-                        foreach (double threshold in thresholds)
-                        {
-                            isIsoLine = (minValue < threshold) && (maxValue >= threshold);
-                            if (isIsoLine)
-                            {
-                                break;
-                            }
-                        }
+                        //foreach (double threshold in thresholds)
+                        //{
+                        double threshold = 0.0;
+                        isIsoLine = (minValue < threshold) && (maxValue >= threshold);
+                        //    if (isIsoLine)
+                        //    {
+                        //        break;
+                        //    }
+                        //}
 
                         Color color;
                         if (isIsoLine)
