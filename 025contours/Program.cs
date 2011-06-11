@@ -15,7 +15,7 @@ namespace _025contours
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            //Application.Run(new Form1());
+            //Application.Run(new IsoContoursCpuForm());
 
             using (IsoContoursGpu example = new IsoContoursGpu())
             {

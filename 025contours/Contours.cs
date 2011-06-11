@@ -8,7 +8,7 @@ using Raster;
 
 namespace _025contours
 {
-    public partial class Form1 : Form
+    public partial class IsoContoursCpuForm : Form
     {
         /// <summary>
         /// Initialize the function-selection combo-box.

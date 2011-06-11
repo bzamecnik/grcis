@@ -1,6 +1,6 @@
 ﻿namespace _025contours
 {
-  partial class Form1
+  partial class IsoContoursCpuForm
   {
     /// <summary>
     /// Required designer variable.

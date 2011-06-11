@@ -7,7 +7,7 @@ using OpenTK;
 
 namespace _025contours
 {
-    public partial class Form1 : Form
+    public partial class IsoContoursCpuForm : Form
     {
         /// <summary>
         /// Output raster image.
@@ -104,7 +104,7 @@ namespace _025contours
             }
         }
 
-        public Form1()
+        public IsoContoursCpuForm()
         {
             InitializeComponent();
             InitializeFunctions();

@@ -45,8 +45,8 @@ namespace _025contours
         // scale factor for XY coordinates
         float UniformScaleFactor = 0.4f;
         // offset in XY window coordinates
-        float UniformOffsetX = 100;
-        float UniformOffsetY = 100;
+        float UniformOffsetX = 0;
+        float UniformOffsetY = 0;
         // offset in Z coordinate - function value
         float UniformValueDrift = 0.0f;
 
@@ -66,6 +66,12 @@ namespace _025contours
         string fragmentShaderTemplate;
 
         GlslFunctionEditor functionEditor;
+
+        private bool dragging = false;
+
+        private int lastX, lastY;
+
+        MouseButton? lastButton;
 
         /// <summary>
         /// Implicit R^2->R function to be evaluated in fragment shader
@@ -115,6 +121,8 @@ namespace _025contours
         /// <param name="e">Not used.</param>
         protected override void OnLoad(EventArgs e)
         {
+            PrepareThresholds(UniformThresholdCount);
+
             // Check for necessary capabilities:
             string version = GL.GetString(StringName.Version);
             int major = (int)version[0];
@@ -207,6 +215,10 @@ namespace _025contours
 
             Keyboard.KeyUp += KeyUp;
             Keyboard.KeyDown += KeyDown;
+            Mouse.ButtonDown += MouseButtonDown;
+            Mouse.ButtonUp += MouseButtonUp;
+            Mouse.Move += MouseMove;
+            //Mouse.WheelChanged += MouseWheelChanged;
         }
 
         private string FillFunctionIntoFragmentShader(string fragmentShaderTemplate, string functionSource)
@@ -295,13 +307,15 @@ namespace _025contours
             }
             else if (e.Key == Key.P)
             {
-                UniformThresholdCount += 1;
-                PrepareThresholds();
+                PrepareThresholds(UniformThresholdCount + 1);
             }
             else if (e.Key == Key.M)
             {
-                UniformThresholdCount -= 1;
-                PrepareThresholds();
+                PrepareThresholds(UniformThresholdCount - 1);
+            }
+            else if (e.Key == Key.R)
+            {
+                ResetScale();
             }
         }
 
@@ -310,11 +324,11 @@ namespace _025contours
             if (e.Key == Key.F1)
             {
                 MessageBox.Show(
-@"Program help:
+@"===== Program help =====
 
 Compute iso-contours of an implicit function R^2 -> R.
 
-Key controls:
+==== Key controls ====
 
 F - choose next function
 P - more thresholds (uniformly distributed, up to 256)
@@ -328,13 +342,21 @@ Z - zoom in
 X - zoom out
 Q - shift function value up
 E - shift function value down
+R - reset scroll, zoom, shift
 
 F1 - show help
 F4 - edit functions
 F11 - toggle full screen
 F12 - save screen shot
 
-Credits:
+==== Mouse controls ==== 
+
+Left button + drag - scroll up/down, left/right
+Right button + drag up/down - zoom in/out
+Right button + drag left/right - shift function value
+SHIFT + left button + drag up/down - change number of thresholds
+
+==== Credits ====
 
 Implementation - Bohumír Zameèník, 2011, MFF UK
 Algorithm - Josef Pelikán, 1992, MFF UK
@@ -363,6 +385,52 @@ Program skeleton - OpenTK Library Examples
             else if (e.Key == Key.F12)
             {
                 SaveScreenshot();
+            }
+        }
+
+        void MouseButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.Button == MouseButton.Left ||
+                 e.Button == MouseButton.Right)
+            {
+                dragging = true;
+                lastX = e.X;
+                lastY = e.Y;
+                lastButton = e.Button;
+            }
+        }
+
+        void MouseButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            dragging = false;
+            lastButton = null;
+        }
+
+        void MouseMove(object sender, MouseMoveEventArgs e)
+        {
+            if (!dragging || !lastButton.HasValue) return;
+
+            if (lastButton.Value == MouseButton.Left)
+            {
+                if (Keyboard[Key.ShiftLeft] || Keyboard[Key.ShiftRight])
+                {
+                    PrepareThresholds(UniformThresholdCount - (e.YDelta / 2));
+                }
+                else
+                {
+                    UniformOffsetX += e.X - lastX;
+                    UniformOffsetY -= e.Y - lastY;
+                    lastX = e.X;
+                    lastY = e.Y;
+                }
+            }
+
+            if (lastButton.Value == MouseButton.Right)
+            {
+                UniformScaleFactor *= (float)Math.Exp(0.01 * (e.Y - lastY));
+                UniformValueDrift += 0.02f * (e.X - lastX);
+                lastX = e.X;
+                lastY = e.Y;
             }
         }
 
@@ -467,7 +535,6 @@ Program skeleton - OpenTK Library Examples
             GL.Uniform2(GL.GetUniformLocation(ProgramObject, "offset"), new Vector2(UniformOffsetX, UniformOffsetY));
             GL.Uniform1(GL.GetUniformLocation(ProgramObject, "valueDrift"), UniformValueDrift);
 
-            PrepareThresholds();
             GL.Uniform1(GL.GetUniformLocation(ProgramObject, "thresholds"), UniformThresholdCount, ref UniformThresholds[0]);
             GL.Uniform1(GL.GetUniformLocation(ProgramObject, "thresholdCount"), UniformThresholdCount);
 
@@ -485,25 +552,37 @@ Program skeleton - OpenTK Library Examples
 
         #endregion
 
-        private void PrepareThresholds()
+        private void PrepareThresholds(int thresholdCount)
         {
-            if ((UniformThresholdCount <= 0) || (UniformThresholdCount > MaxThresholdCount))
+            if ((thresholdCount <= 0) || (thresholdCount > MaxThresholdCount))
             {
+                thresholdCount = Math.Min(thresholdCount, MaxThresholdCount);
+                thresholdCount = Math.Max(thresholdCount, 1);
                 return;
             }
+            UniformThresholdCount = thresholdCount;
 
-            UniformThresholds = new float[UniformThresholdCount];
+            UniformThresholds = new float[thresholdCount];
 
             float thresholdMin = -4.0f;
             float thresholdMax = 4.0f;
 
-            float thresholdStep = (thresholdMax - thresholdMin) / (float)UniformThresholdCount;
+            float thresholdStep = (thresholdMax - thresholdMin) / (float)thresholdCount;
             float threshold = thresholdMin;
-            for (int i = 0; i < UniformThresholdCount; i++)
+            for (int i = 0; i < thresholdCount; i++)
             {
                 threshold += thresholdStep;
                 UniformThresholds[i] = threshold;
             }
+        }
+
+        private void ResetScale()
+        {
+            UniformOffsetX = Width / 2.0f;
+            UniformOffsetY = Height / 2.0f;
+            UniformScaleFactor = 0.4f;
+            UniformValueDrift = 0.0f;
+            PrepareThresholds(50);
         }
     }
 }
