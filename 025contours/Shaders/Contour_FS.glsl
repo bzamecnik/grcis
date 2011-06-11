@@ -4,24 +4,22 @@ uniform vec2 offset;
 uniform float scale;
 uniform float valueDrift;
 uniform int functionIndex;
+uniform float thresholds[256];
+uniform int thresholdCount;
 
-// TODO: pass thresholds as a 1D texture
+// TODO:
+// - enable compiling the shader with user-supplied function
+// - the computation could be performed in two phases
+//   - first, the function could be sampled and stored into a texture
+//   - second, the isocontours could be computed
+//     - function evaluation could be done as texture lookup
 
-float f_waves0(in float x, in float y) {
-	return sin(0.1 * x) + cos(0.1 * y);
-}
-
-float f_drop0(in float x, in float y) {
-	float r = 0.1 * sqrt(x * x + y * y);
-	return ((r <= 10e-16) ? 10.0 : (10.0 * sin(r) / r));
+float implicit_function(in float x, in float y) {
+// ### FUNCTION ###
 }
 
 float f(in float x, in float y) {
-	if (functionIndex == 0) {
-		return f_drop0(x * scale, y * scale) + valueDrift;
-	} else {
-		return f_waves0(x * scale, y * scale) + valueDrift;	
-	}
+	return implicit_function(x * scale, y * scale) + valueDrift;
 }
 
 // Algorithm:
@@ -43,14 +41,8 @@ bool isIsoContour(vec2 coord) {
 		maxValue = max(maxValue, sideCenterValues[i]);
 	}
 	bool isContour = false;
-	// threshold generated on the fly (uniformly separated)
-	float thresholdMin = -4;
-	float thresholdMax = 4;
-	int thresholdCount = 50;
-	float thresholdStep = (thresholdMax - thresholdMin) / (float)thresholdCount;
-	float threshold = thresholdMin;
 	for (int i = 0; i < thresholdCount; i++) {
-		threshold += thresholdStep;
+		float threshold = thresholds[i];
 		// It is better not to break early as we know there is an isocontour.
 		// Conditional execution slows the shader more the a few unnecessary
 		// comparisons.
@@ -60,14 +52,16 @@ bool isIsoContour(vec2 coord) {
 }
 
 void main() {
-	//gl_FragColor = texture2D(functionTex, texCoord);
 	vec2 coord = (gl_FragCoord.xy - offset);
 	
 	if (isIsoContour(coord)) {
 		// show isoline
-		gl_FragColor.rgb = vec3(0, 0.9, 0);
+		gl_FragColor.rgb = vec3(0.0, 0.0, 0.0);
 	} else {
-		// plot the color-coded function value
-		gl_FragColor.r = 0.25 * f(coord.x, coord.y) + 0.5;
+		//plot the color-coded function value
+		float intensity = 0.25 * f(coord.x, coord.y);
+		gl_FragColor.r = 0.75 + intensity;
+		gl_FragColor.b = 0.75 - intensity;
+		gl_FragColor.g = 0.75;
 	}
 }

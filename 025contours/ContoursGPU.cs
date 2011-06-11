@@ -1,4 +1,15 @@
 #region --- License ---
+
+// Iso-contours of implicit functions.
+// Author: Bohumir Zamecnik <bohumir.zamecnik at gmail dot com>
+// Date: May/June 2011
+// Original algorithm:
+//   Josef Pelikan: Raster algorithms for computing iso-contours,
+//   KSVI MFF UK, 1992.
+
+// The skeleton of the application is based on the Julia fractal demo
+// from OpenTK examples.
+
 /* Licensed under the MIT/X11 license.
  * Copyright (c) 2006-2008 the OpenTK Team.
  * This notice may not be removed from any source distribution.
@@ -9,12 +20,13 @@
 #endregion
 
 using System;
-using System.Windows.Forms;
+using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-
+using System.Windows.Forms;
 using OpenTK;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
@@ -24,11 +36,6 @@ namespace _025contours
 {
     public class IsoContoursGpu : GameWindow
     {
-        public IsoContoursGpu()
-            : base(512, 512)
-        {
-        }
-
         #region Private Fields
 
         // GLSL Objects
@@ -43,8 +50,11 @@ namespace _025contours
         // offset in Z coordinate - function value
         float UniformValueDrift = 0.0f;
 
-        int totalFunctionsCount = 2;
-        int UnifromFunctionIndex = 1;
+        private static readonly int MaxThresholdCount = 256;
+        private float[] UniformThresholds = new float[MaxThresholdCount];
+        private int UniformThresholdCount = 50;
+
+        int currentFunctionIndex = 0;
 
         int screenshotCount = 0;
 
@@ -52,6 +62,48 @@ namespace _025contours
         int renderTimeAveragingFrameCount = 10;
         int frameIndex = 0;
         double renderTimeSum = 0;
+
+        string fragmentShaderTemplate;
+
+        GlslFunctionEditor functionEditor;
+
+        /// <summary>
+        /// Implicit R^2->R function to be evaluated in fragment shader
+        /// (source code of a body of a GLSL function).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The function can be two float input parameters x, y
+        /// and have to return a single float value.
+        /// </para>
+        /// <para>
+        /// For example, such a source
+        /// <code>
+        /// return sin(0.1 * x) + cos(0.1 * y);
+        /// </code>
+        /// will be expanded into the following or similar function:
+        /// <code>
+        /// float f(in float x, in float y) {
+        ///     return sin(0.1 * x) + cos(0.1 * y);
+        /// }
+        /// </code>
+        /// </para>
+        /// </remarks>
+        string FunctionSource { get; set; }
+
+        IDictionary<string, string> ImplicitFunctions = new Dictionary<string, string>();
+
+        public IsoContoursGpu()
+            : base(512, 512)
+        {
+            ImplicitFunctions.Add("waves",
+@"    return sin(0.1 * x) + cos(0.1 * y);");
+            ImplicitFunctions.Add("drop",
+@"    float r = 0.1 * sqrt(x * x + y * y);
+    return ((r <= 10e-16) ? 10.0 : (10.0 * sin(r) / r));");
+            ImplicitFunctions.Add("inverse_gradient",
+@"    return 0.001 * x * y;");
+        }
 
         #endregion private Fields
 
@@ -101,10 +153,17 @@ namespace _025contours
             // Load&Compile Fragment Shader
             using (StreamReader sr = new StreamReader("Shaders/Contour_FS.glsl"))
             {
-                FragmentShaderObject = GL.CreateShader(ShaderType.FragmentShader);
-                GL.ShaderSource(FragmentShaderObject, sr.ReadToEnd());
-                GL.CompileShader(FragmentShaderObject);
+                fragmentShaderTemplate = sr.ReadToEnd();
             }
+
+            FunctionSource = GetImplicitFunctionSource();
+
+            string fragmentShaderSource = FillFunctionIntoFragmentShader(
+                fragmentShaderTemplate, FunctionSource);
+
+            FragmentShaderObject = GL.CreateShader(ShaderType.FragmentShader);
+            GL.ShaderSource(FragmentShaderObject, fragmentShaderSource);
+            GL.CompileShader(FragmentShaderObject);
 
             GL.GetShaderInfoLog(FragmentShaderObject, out LogInfo);
             if (LogInfo.Length > 0 && !LogInfo.Contains("hardware"))
@@ -150,23 +209,67 @@ namespace _025contours
             Keyboard.KeyDown += KeyDown;
         }
 
+        private string FillFunctionIntoFragmentShader(string fragmentShaderTemplate, string functionSource)
+        {
+            return fragmentShaderTemplate.Replace("// ### FUNCTION ###", functionSource);
+        }
+
+        private string GetImplicitFunctionSource()
+        {
+            if ((ImplicitFunctions.Count > 0) && (currentFunctionIndex < ImplicitFunctions.Count))
+            {
+                return ImplicitFunctions.Values.ElementAt(currentFunctionIndex);
+            }
+            else
+            {
+                return "return 0.0;";
+            }
+        }
+
+        private void RecompileFragmentShader()
+        {
+            //GL.UseProgram(0);
+            //GL.DetachShader(ProgramObject, FragmentShaderObject);
+
+            FunctionSource = GetImplicitFunctionSource();
+            string fragmentShaderSource = FillFunctionIntoFragmentShader(
+                fragmentShaderTemplate, FunctionSource);
+
+            GL.ShaderSource(FragmentShaderObject, fragmentShaderSource);
+            GL.CompileShader(FragmentShaderObject);
+
+            string logInfo;
+            GL.GetShaderInfoLog(FragmentShaderObject, out logInfo);
+            if (logInfo.Length > 0 && !logInfo.Contains("hardware"))
+                Trace.WriteLine("Fragment Shader Log:\n" + logInfo);
+            else
+                Trace.WriteLine("Fragment Shader compiled without complaint.");
+
+            // Link the Shaders to a usable Program
+            //GL.AttachShader(ProgramObject, FragmentShaderObject);
+            GL.LinkProgram(ProgramObject);
+
+            // make current
+            //GL.UseProgram(ProgramObject);
+        }
+
         void KeyDown(object sender, KeyboardKeyEventArgs e)
         {
             if (e.Key == Key.W)
             {
-                UniformOffsetY += 10;
+                UniformOffsetY -= 10;
             }
             else if (e.Key == Key.S)
             {
-                UniformOffsetY -= 10;
+                UniformOffsetY += 10;
             }
             else if (e.Key == Key.D)
             {
-                UniformOffsetX += 10;
+                UniformOffsetX -= 10;
             }
             else if (e.Key == Key.A)
             {
-                UniformOffsetX -= 10;
+                UniformOffsetX += 10;
             }
             else if (e.Key == Key.Q)
             {
@@ -186,14 +289,78 @@ namespace _025contours
             }
             else if (e.Key == Key.F)
             {
-                UnifromFunctionIndex += 1;
-                UnifromFunctionIndex %= totalFunctionsCount;
+                currentFunctionIndex += 1;
+                currentFunctionIndex %= ImplicitFunctions.Count;
+                RecompileFragmentShader();
+            }
+            else if (e.Key == Key.P)
+            {
+                UniformThresholdCount += 1;
+                PrepareThresholds();
+            }
+            else if (e.Key == Key.M)
+            {
+                UniformThresholdCount -= 1;
+                PrepareThresholds();
             }
         }
 
         void KeyUp(object sender, KeyboardKeyEventArgs e)
         {
-            if (e.Key == Key.F12)
+            if (e.Key == Key.F1)
+            {
+                MessageBox.Show(
+@"Program help:
+
+Compute iso-contours of an implicit function R^2 -> R.
+
+Key controls:
+
+F - choose next function
+P - more thresholds (uniformly distributed, up to 256)
+M - less thresholds
+
+W - scroll up
+S - scroll down
+A - sroll left
+D - scroll right
+Z - zoom in
+X - zoom out
+Q - shift function value up
+E - shift function value down
+
+F1 - show help
+F4 - edit functions
+F11 - toggle full screen
+F12 - save screen shot
+
+Credits:
+
+Implementation - Bohumír Zameèník, 2011, MFF UK
+Algorithm - Josef Pelikán, 1992, MFF UK
+Program skeleton - OpenTK Library Examples
+", "Iso-contours of implicit functions on GPU");
+            }
+            else if (e.Key == Key.F4)
+            {
+                if (functionEditor == null)
+                {
+                    functionEditor = new GlslFunctionEditor();
+                }
+                functionEditor.ImplicitFunctions = ImplicitFunctions;
+                functionEditor.ShowDialog();
+                if (functionEditor.DialogResult == DialogResult.OK)
+                {
+                    ImplicitFunctions = functionEditor.ImplicitFunctions;
+                }
+                RecompileFragmentShader();
+            }
+            else if (e.Key == Key.F11)
+            {
+                bool isFullscreen = (WindowState == WindowState.Fullscreen);
+                WindowState = isFullscreen ? WindowState.Normal : WindowState.Fullscreen;
+            }
+            else if (e.Key == Key.F12)
             {
                 SaveScreenshot();
             }
@@ -288,25 +455,22 @@ namespace _025contours
             if (frameIndex == 0)
             {
                 double renderTimeAvg = renderTimeSum / renderTimeAveragingFrameCount;
-                this.Title = string.Format("Average FPS: {0:0.##}, time: {1:0.##} ms",
-                    1 / renderTimeAvg, 1000 * renderTimeAvg);
+                this.Title = string.Format("Iso-contours. Average FPS: {0:0.##}, time: {1:0.##} ms, thresholds: {2}. Press F1 for help.",
+                    1 / renderTimeAvg, 1000 * renderTimeAvg, UniformThresholdCount);
                 renderTimeSum = 0;
             }
             GL.Clear(ClearBufferMask.ColorBufferBit);
 
-            // First, render the next frame of the Julia fractal.
             GL.UseProgram(ProgramObject);
 
-            // pass uniforms into the fragment shader
-            // first the texture
-            //GL.Uniform1(GL.GetUniformLocation(ProgramObject, "COLORTABLE"), TextureObject);
-            // the rest are floats
             GL.Uniform1(GL.GetUniformLocation(ProgramObject, "scale"), UniformScaleFactor);
             GL.Uniform2(GL.GetUniformLocation(ProgramObject, "offset"), new Vector2(UniformOffsetX, UniformOffsetY));
             GL.Uniform1(GL.GetUniformLocation(ProgramObject, "valueDrift"), UniformValueDrift);
-            GL.Uniform1(GL.GetUniformLocation(ProgramObject, "functionIndex"), UnifromFunctionIndex);
 
-            // Fullscreen quad. Using immediate mode, since this app is fragment shader limited anyways.
+            PrepareThresholds();
+            GL.Uniform1(GL.GetUniformLocation(ProgramObject, "thresholds"), UniformThresholdCount, ref UniformThresholds[0]);
+            GL.Uniform1(GL.GetUniformLocation(ProgramObject, "thresholdCount"), UniformThresholdCount);
+
             GL.Begin(BeginMode.Quads);
             {
                 GL.TexCoord2(0, 1); GL.Vertex2(-1.0f, 1.0f);
@@ -320,5 +484,26 @@ namespace _025contours
         }
 
         #endregion
+
+        private void PrepareThresholds()
+        {
+            if ((UniformThresholdCount <= 0) || (UniformThresholdCount > MaxThresholdCount))
+            {
+                return;
+            }
+
+            UniformThresholds = new float[UniformThresholdCount];
+
+            float thresholdMin = -4.0f;
+            float thresholdMax = 4.0f;
+
+            float thresholdStep = (thresholdMax - thresholdMin) / (float)UniformThresholdCount;
+            float threshold = thresholdMin;
+            for (int i = 0; i < UniformThresholdCount; i++)
+            {
+                threshold += thresholdStep;
+                UniformThresholds[i] = threshold;
+            }
+        }
     }
 }
