@@ -15,6 +15,11 @@ namespace _025contours
         /// </summary>
         protected void InitializeFunctions()
         {
+
+            // threshold set
+            for (double d = -10.0; d <= 10.0; d += 0.2)
+                thr.Add(d);
+
             functions = new List<Func<double, double, double>>();
 
             // 0:
@@ -30,10 +35,6 @@ namespace _025contours
 
             comboFunction.SelectedIndex = 0;
             f = functions[0];
-
-            // threshold set
-            for (double d = -10.0; d <= 10.0; d += 0.2)
-                thr.Add(d);
         }
 
         /// <summary>
@@ -75,15 +76,14 @@ namespace _025contours
                         double maxValue = values.Max();
 
                         bool isIsoLine = false;
-                        //foreach (double threshold in thresholds)
-                        //{
-                        double threshold = 0.0;
-                        isIsoLine = (minValue < threshold) && (maxValue >= threshold);
-                        //    if (isIsoLine)
-                        //    {
-                        //        break;
-                        //    }
-                        //}
+                        foreach (double threshold in thresholds)
+                        {
+                            isIsoLine = (minValue < threshold) && (maxValue >= threshold);
+                            if (isIsoLine)
+                            {
+                                break;
+                            }
+                        }
 
                         Color color;
                         if (isIsoLine)

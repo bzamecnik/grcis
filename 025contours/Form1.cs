@@ -37,7 +37,7 @@ namespace _025contours
         /// <summary>
         /// Scaling factor from Bitmap coordinates to function argument space.
         /// </summary>
-        protected double scale = 1.0;
+        protected double scale = 0.4;
 
         /// <summary>
         /// Threshold drift (from the standard threshold set).
@@ -48,7 +48,7 @@ namespace _025contours
         {
             origin.X = panel1.Width / 2;
             origin.Y = panel1.Height / 2;
-            scale = 1.0;
+            scale = 0.4;
             valueDrift = 0.0;
         }
 

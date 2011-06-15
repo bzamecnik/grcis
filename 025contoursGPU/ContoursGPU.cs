@@ -564,8 +564,8 @@ Program skeleton - OpenTK Library Examples
 
             UniformThresholds = new float[thresholdCount];
 
-            float thresholdMin = -4.0f;
-            float thresholdMax = 4.0f;
+            float thresholdMin = -10.0f;
+            float thresholdMax = 10.0f;
 
             float thresholdStep = (thresholdMax - thresholdMin) / (float)thresholdCount;
             float threshold = thresholdMin;

@@ -1,6 +1,4 @@
-﻿//uniform sampler2D functionTex;
-//varying vec2 texCoord; // rather gl_TexCoord[0]
-uniform vec2 offset;
+﻿uniform vec2 offset;
 uniform float scale;
 uniform float valueDrift;
 uniform int functionIndex;
@@ -8,7 +6,6 @@ uniform float thresholds[256];
 uniform int thresholdCount;
 
 // TODO:
-// - enable compiling the shader with user-supplied function
 // - the computation could be performed in two phases
 //   - first, the function could be sampled and stored into a texture
 //   - second, the isocontours could be computed
