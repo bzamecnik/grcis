@@ -14,11 +14,17 @@ namespace VolumeDataConverter
         {
             Stopwatch sw = Stopwatch.StartNew();
 
-            var dataSet = VolumeDataSet.LoadFromFile(@"..\..\..\headCT.head", @"..\..\..\headCT.raw.gz");
+            var dataSet = VolumeDataSet.LoadFromFile(@"..\..\..\headCT.head", @"..\..\..\headCT.raw");
 
             sw.Stop();
             Console.WriteLine("Loaded volume in {0} ms", sw.ElapsedMilliseconds);
-            sw.Reset();
+
+            //RenderDepthSlicesToBitmaps(dataSet);
+        }
+
+        private static void RenderDepthSlicesToBitmaps(VolumeDataSet dataSet)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
 
             double min;
             double max;
@@ -48,13 +54,15 @@ namespace VolumeDataConverter
             min = double.PositiveInfinity;
             max = double.NegativeInfinity;
             var values = grid.Values;
+            int index = channel;
             for (int z = 0; z < grid.Depth; z++)
                 for (int y = 0; y < grid.Height; y++)
                     for (int x = 0; x < grid.Width; x++)
                     {
-                        double value = values[x, y, z, channel];
+                        double value = values[index];
                         min = Math.Min(min, value);
                         max = Math.Max(max, value);
+                        index += grid.ChannelCount;
                     }
         }
     }

@@ -83,13 +83,15 @@ namespace VolumeData
             min = double.PositiveInfinity;
             max = double.NegativeInfinity;
             var values = grid.Values;
+            int index = channel;
             for (int z = 0; z < grid.Depth; z++)
                 for (int y = 0; y < grid.Height; y++)
                     for (int x = 0; x < grid.Width; x++)
                     {
-                        double value = values[x, y, z, channel];
+                        double value = values[index];
                         min = Math.Min(min, value);
                         max = Math.Max(max, value);
+                        index += grid.ChannelCount;
                     }
         }
 

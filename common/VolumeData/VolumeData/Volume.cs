@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
 
 namespace VolumeData
 {
@@ -42,8 +43,15 @@ namespace VolumeData
         /// </summary>
         public int ChannelCount { get; private set; }
 
+        /// <summary>
+        /// Bits per signel voxel value channel.
+        /// Allowed: [8, 16, 32, 64].
+        /// </summary>
         public int BitsPerChannel { get; private set; }
 
+        /// <summary>
+        /// Type of a signle channel voxel value.
+        /// </summary>
         public Type VoxelValueType { get; private set; }
 
         /// <summary>
@@ -232,10 +240,10 @@ namespace VolumeData
                 bool gzipped = rawFile.EndsWith(".gz");
                 using (FileStream fs = new FileStream(rawFile, FileMode.Open))
                 {
-                    Stream stream = fs;
+                    Stream stream = new BufferedStream(fs, 32 * 1024);
                     if (gzipped)
                     {
-                        stream = new GZipStream(fs, CompressionMode.Decompress);
+                        stream = new GZipStream(stream, CompressionMode.Decompress);
                     }
                     using (BinaryReader reader = new BinaryReader(stream))
                     {
@@ -245,7 +253,6 @@ namespace VolumeData
                             VolumeGrid.LoadFromReader(reader, valueReadFunc,
                                 ref dataSet.TimeSlices[time]);
                         }
-
                     }
                 }
             }
@@ -296,13 +303,32 @@ namespace VolumeData
         public class VolumeGrid
         {
             /// <summary>
-            /// Volume 3D table, possibly with vector values. [x,y,z,channel].
+            /// Volume 3D table, possibly with vector values.
             /// </summary>
-            public double[, , ,] Values { get; private set; }
+            public double[] Values { get; private set; }
             public int Width { get; private set; }
             public int Height { get; private set; }
             public int Depth { get; private set; }
             public int ChannelCount { get; private set; }
+
+            public double this[int x, int y, int z, int channel]
+            {
+                get
+                {
+                    return Values[GetLinearIndex(x, y, z, channel)];
+                }
+                set
+                {
+                    Values[GetLinearIndex(x, y, z, channel)] = value;
+                }
+            }
+
+            public int GetLinearIndex(int x, int y, int z, int channel)
+            {
+                //return channel + x * ChannelCount + y * ChannelCount * Width
+                //    + z * ChannelCount * Width * Height;
+                return ((z * Height + y) * Width + x) * ChannelCount + channel;
+            }
 
             public VolumeGrid(int[] size, int channelCount)
             {
@@ -310,23 +336,36 @@ namespace VolumeData
                 Height = size[1];
                 Depth = size[2];
                 ChannelCount = channelCount;
-                Values = new double[Width, Height, Depth, channelCount];
+                //Stopwatch sw = Stopwatch.StartNew();
+                Values = new double[Width * Height * Depth * channelCount];
+                //sw.Stop();
+                //Console.WriteLine("allocated {0}x{1}x{2}x{3} doubles in {4} ms",
+                //    Width, Height, Depth, channelCount, sw.ElapsedMilliseconds);
             }
 
             public static VolumeGrid LoadFromReader(BinaryReader reader, Func<BinaryReader, double> readFunc, ref VolumeGrid volumeGrid)
             {
                 var values = volumeGrid.Values;
-                for (int z = 0; z < volumeGrid.Depth; z++)
-                    for (int y = 0; y < volumeGrid.Height; y++)
-                        for (int x = 0; x < volumeGrid.Width; x++)
-                            for (int channel = 0; channel < volumeGrid.ChannelCount; channel++)
-                                values[x, y, z, channel] = readFunc(reader);
+                int depth = volumeGrid.Depth;
+                int height = volumeGrid.Height;
+                int width = volumeGrid.Width;
+                int channelCount = volumeGrid.ChannelCount;
+                int index = 0;
+                for (int z = 0; z < depth; z++)
+                    for (int y = 0; y < height; y++)
+                        for (int x = 0; x < width; x++)
+                            for (int channel = 0; channel < channelCount; channel++)
+                            {
+                                values[index] = readFunc(reader);
+                                index++;
+                            }
                 return volumeGrid;
             }
 
             public Bitmap DepthSliceToBitmap(int z, Func<double[], Color> colorFunc)
             {
                 Bitmap bitmap = new Bitmap(Width, Height);
+                int index = z * Width * Height * ChannelCount;
                 for (int y = 0; y < Height; y++)
                 {
                     for (int x = 0; x < Width; x++)
@@ -334,7 +373,8 @@ namespace VolumeData
                         double[] value = new double[ChannelCount];
                         for (int channel = 0; channel < ChannelCount; channel++)
                         {
-                            value[channel] = Values[x, y, z, channel];
+                            value[channel] = Values[index];
+                            index++;
                         }
                         bitmap.SetPixel(x, y, colorFunc(value));
                     }
