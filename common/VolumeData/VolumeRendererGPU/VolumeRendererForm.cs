@@ -42,7 +42,7 @@ namespace VolumeRendererGPU
         MouseButton? lastButton;
 
         public VolumeRendererForm()
-            : base(800, 600)
+            : base(512, 512)
         {
             //worldToCamera = Matrix4.Identity;
             //uniformCameraToWorld = Matrix4.Identity;
@@ -103,6 +103,7 @@ namespace VolumeRendererGPU
             GL.Uniform1(GL.GetUniformLocation(shaderProgram, "selectedDepth"), uniformSelectedDepth);
             GL.UniformMatrix4(GL.GetUniformLocation(shaderProgram, "cameraToWorld"),
                 false, ref uniformCameraToWorld);
+            GL.Uniform2(GL.GetUniformLocation(shaderProgram, "senzorSize"), new Vector2(1.0f, Width / (float)Height));
 
             Keyboard.KeyUp += KeyUp;
             Mouse.ButtonDown += MouseButtonDown;
@@ -167,10 +168,14 @@ namespace VolumeRendererGPU
             IntPtr volumeData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(float)) * width * height * depth);
             //float minValue = float.PositiveInfinity;
             //float maxValue = float.NegativeInfinity;
+
+            Stopwatch sw = Stopwatch.StartNew();
+
             unsafe
             {
                 int rowIndex = 0;
                 float scale = 1 / 4095.0f;
+                var values = currentVolume.Values;
                 for (int z = 0; z < depth; z++)
                 {
                     for (int y = 0; y < height; y++)
@@ -179,7 +184,8 @@ namespace VolumeRendererGPU
                         float* row = (float*)volumeData + rowIndex;
                         for (int x = 0; x < width; x++)
                         {
-                            float value = (float)currentVolume[x, y, z, 0];
+                            //float value = (float)currentVolume[x, y, z, 0];
+                            float value = (float)currentVolume.Values[rowIndex + x];
                             //minValue = Math.Min(value, minValue);
                             //maxValue = Math.Max(value, maxValue);
                             row[x] = value * scale;
@@ -188,15 +194,23 @@ namespace VolumeRendererGPU
                         rowIndex += width;
                     }
                 }
+                sw.Stop();
+                Console.WriteLine("Converted volume to 3D texture in {0} ms", sw.ElapsedMilliseconds);
             }
             //uniformValueRange = new Vector2(minValue, maxValue);
 
             int textureId = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, textureId);
 
+            sw.Reset();
+            sw.Start();
+
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.One,
                 width, height, depth, 0,
                 PixelFormat.Luminance, PixelType.Float, volumeData);
+
+            sw.Stop();
+            Console.WriteLine("Uploaded 3D volume texture to GPU in {0} ms", sw.ElapsedMilliseconds);
 
             // TODO: delete volumeData if needed
             //Marshal.FreeHGlobal(volumeData);
@@ -348,7 +362,7 @@ Program skeleton - OpenTK Library Examples
                 uniformSelectedDepth = e.Y / (float)Height;
 
                 // [-PI/2; PI/2]
-                double eyeTheta = Math.PI * ((e.Y / (float)Height) - 0.5);
+                double eyeTheta = Math.PI * (1 - (e.Y / (float)Height));
                 Console.WriteLine(eyeTheta);
                 // [0; 2 PI]
                 double eyePhi = 2 * Math.PI * (e.X / (float)Width);
@@ -360,11 +374,15 @@ Program skeleton - OpenTK Library Examples
                 //    (float)(Math.Sin(eyeTheta)));
                 //UpdateCameraTransform(eye);
 
-                worldToCamera = Matrix4.CreateTranslation(new Vector3(0, 0, -eyeRadius));
+                //worldToCamera = Matrix4.CreateTranslation(new Vector3(0, 0, -eyeRadius));
+                //worldToCamera = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
                 //worldToCamera *= Matrix4.CreateRotationX((float)eyeTheta);
                 //worldToCamera *= Matrix4.CreateRotationZ((float)eyePhi);
                 //worldToCamera = Matrix4.Identity;
-                uniformCameraToWorld = Matrix4.Invert(worldToCamera);
+                //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
+                uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
+                uniformCameraToWorld *= Matrix4.CreateRotationX((float)-eyeTheta);
+                uniformCameraToWorld *= Matrix4.CreateRotationZ((float)-eyePhi);
             }
             lastX = e.X;
             lastY = e.Y;
@@ -372,7 +390,7 @@ Program skeleton - OpenTK Library Examples
 
         private void UpdateCameraTransform(Vector3 eye)
         {
-            worldToCamera = Matrix4.LookAt(eye, Vector3.Zero, Vector3.UnitY);
+            worldToCamera = Matrix4.LookAt(eye, new Vector3(0.5f, 0.5f, 0.5f), Vector3.UnitY);
             uniformCameraToWorld = Matrix4.Invert(worldToCamera);
         }
 
