@@ -18,10 +18,12 @@ namespace VolumeRenderer
             Console.WriteLine("Loaded volume in {0} ms", sw.ElapsedMilliseconds);
             sw.Reset();
             sw.Start();
-            Bitmap image = SliceCollector.RenderGlowingFog(dataSet, null);
+            //Bitmap image = SliceCollector.RenderGlowingFog(dataSet, null);
+            Bitmap image = RayCaster.RenderMaxIntensityProjection(dataSet, null);
             sw.Stop();
             Console.WriteLine("Rendered volume in {0} ms", sw.ElapsedMilliseconds);
-            image.Save(@"headCT_z_sabella.png");
+            //image.Save(@"headCT_z_sabella.png");
+            image.Save(@"headCT_raycast_mip.png");
         }
     }
 }
