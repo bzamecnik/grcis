@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolumeDataConverter", "Volu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolumeRenderer", "VolumeRenderer\VolumeRenderer.csproj", "{59663D2C-AA16-4043-AFE4-19587CF714DA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolumeRendererGPU", "VolumeRendererGPU\VolumeRendererGPU.csproj", "{19B0B274-4899-4EC1-A318-29ACB629FD78}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{59663D2C-AA16-4043-AFE4-19587CF714DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{59663D2C-AA16-4043-AFE4-19587CF714DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59663D2C-AA16-4043-AFE4-19587CF714DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19B0B274-4899-4EC1-A318-29ACB629FD78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19B0B274-4899-4EC1-A318-29ACB629FD78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19B0B274-4899-4EC1-A318-29ACB629FD78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19B0B274-4899-4EC1-A318-29ACB629FD78}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

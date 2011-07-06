@@ -44,7 +44,7 @@ namespace VolumeData
         public int ChannelCount { get; private set; }
 
         /// <summary>
-        /// Bits per signel voxel value channel.
+        /// Bits per single voxel value channel.
         /// Allowed: [8, 16, 32, 64].
         /// </summary>
         public int BitsPerChannel { get; private set; }
