@@ -8,6 +8,12 @@ uniform mat4 cameraToWorld;
 
 uniform vec2 senzorSize;
 
+//step for ray marching (in world space units)
+uniform float rayStepLength;
+// attenuation exponent tau
+uniform float attenuationExponent;
+uniform float attenuationThreshold;
+
 vec4 getOrthogonalSlice() {
 	float z = clamp(selectedDepth, 0.0, 1.0);
 	// top view:
@@ -69,8 +75,7 @@ vec4 averageAlongRay(vec3 origin, vec3 directionStep, int count) {
     //vec3 intersectionPos = rayOrigin + t * rayDir;
 
 // pixelPos - pixel position in normalized device space [0; 1]^2
-// rayStepLength - step for ray marching (in world space units)
-vec4 rayCastVolumeMIP(vec2 pixelPos, float rayStepLength) {
+vec4 rayCastVolumeMIP(vec2 pixelPos) {
 	// senzor position in camera space
 	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
 	// TODO: use a matrix (ndcToCamera)
@@ -157,7 +162,25 @@ vec3 hsvToRgbColor(float hue, float saturation, float value) {
     return vec3(r, g, b);
 }
 
-vec4 rayCastVolumeGlowingFog(vec2 pixelPos, float rayStepLength) {
+vec2 getCubeDistanceExtrema(vec3 eye) {
+	float distMin = 1e10;
+	float distMax = 0;
+	
+	for (float z = -0.5; z < 0.51; z += 1) {
+		for (float y = -0.5; y < 0.51; y += 1) {
+			for (float x = -0.5; x < 0.51; x += 1) {
+				vec3 corner = vec3(x, y, z);
+				float dist = length(eye - corner);
+				distMin = min(dist, distMin);
+				distMax = max(dist, distMax);
+			}
+		}
+	}
+	
+	return vec2(distMin, distMax);
+}
+
+vec4 rayCastVolumeGlowingFog(vec2 pixelPos) {
 	// senzor position in camera space
 	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
 	// TODO: use a matrix (ndcToCamera)
@@ -176,17 +199,13 @@ vec4 rayCastVolumeGlowingFog(vec2 pixelPos, float rayStepLength) {
 	vec3 position = rayStart;
 	vec3 rayStep = rayStepLength * normalize(rayDirection);
 	int stepCount = int(length(rayEnd - rayStart) / rayStepLength);
-	
-	// attenuation exponent
-    float tau = 3.0;
 
     float maxDensity = 0;
-    int maxPosition = 0; // position of max density
+    vec3 maxPosition = rayStart; // position of max density
     float attenuation = 1; // accumulator
     float prevIntensity = 0;
     float intensity = 0;
     float thickness = 1;// rayStepLength;
-    float attenuationThreshold = 0.01;
 	
 	for (int i = 0; i < stepCount; i += 1) {
 		float density = texture3D(volumeTexture, position + vec3(0.5, 0.5, 0.5)).r;
@@ -194,10 +213,10 @@ vec4 rayCastVolumeGlowingFog(vec2 pixelPos, float rayStepLength) {
         if (density >= maxDensity)
         {
             maxDensity = density;
-            maxPosition = i;
+            maxPosition = position;
         }
         float sliceIntensity = density * thickness;
-        float sliceAttenuation = exp(-tau * prevIntensity);
+        float sliceAttenuation = exp(-attenuationExponent * prevIntensity);
         attenuation *= sliceAttenuation;
         intensity += sliceIntensity * attenuation;
         prevIntensity = sliceIntensity;
@@ -208,7 +227,8 @@ vec4 rayCastVolumeGlowingFog(vec2 pixelPos, float rayStepLength) {
 
 		position += rayStep;
 	}
-	float maxPositionNormalized = maxPosition / float(stepCount - 1);
+	vec2 distanceExtrema = getCubeDistanceExtrema(rayStart);
+	float maxPositionNormalized = (length(maxPosition - rayStart) - distanceExtrema.x) / (distanceExtrema.y - distanceExtrema.x);
     intensity = min(intensity, 1.0);
 
     return vec4(hsvToRgbColor(1 - maxDensity, 1 - maxPositionNormalized, intensity), 1);
@@ -232,7 +252,7 @@ void main() {
 	
 	//vec3 color = rayCastVolumeMIP(gl_TexCoord[0].st, 1.0/305.0).rgb;
 	//vec3 color = rayCastVolume(gl_TexCoord[0].st, 0.01).rgb;
-	vec3 color = rayCastVolumeGlowingFog(gl_TexCoord[0].st, 1.0/305.0).rgb;
+	vec3 color = rayCastVolumeGlowingFog(gl_TexCoord[0].st).rgb;
 	
 	gl_FragColor = vec4(color.rgb, 1);
 }

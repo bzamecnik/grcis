@@ -109,7 +109,7 @@ namespace VolumeRenderer
             double tau = 3.0;
 
             float maxDensity = float.NegativeInfinity;
-            int maxPosition = 0; // position of max density
+            Vector3 maxPosition = rayStart; // position of max density
             float attenuation = 1; // accumulator
             float prevIntensity = 0;
             float intensity = 0;
@@ -123,7 +123,7 @@ namespace VolumeRenderer
                 if (density >= maxDensity)
                 {
                     maxDensity = density;
-                    maxPosition = i;
+                    maxPosition = position;
                 }
                 float sliceIntensity = density * thickness;
                 float sliceAttenuation = (float)Math.Exp(-tau * prevIntensity);
@@ -138,7 +138,9 @@ namespace VolumeRenderer
                 position += rayStep;
             }
 
-            double maxPositionNormalized = maxPosition / (float)(stepCount - 1);
+            Vector2 distanceExtrema = GetCubeDistanceExtrema(rayStart);
+            double maxPositionNormalized = ((maxPosition - rayStart).Length - distanceExtrema.X) / (distanceExtrema.Y - distanceExtrema.X);
+            //double maxPositionNormalized = maxPosition / (float)(stepCount - 1);
             intensity = Math.Min(intensity, 1);
 
             Vector3 color = SliceCollector.HsvToRgbColorVector3(1 - maxDensity,
@@ -191,6 +193,28 @@ namespace VolumeRenderer
                 return 0;
             }
             return (float)volumeTexture[x, y, z, 0];
+        }
+
+        private static Vector2 GetCubeDistanceExtrema(Vector3 eye)
+        {
+            float distMin = float.PositiveInfinity;
+            float distMax = 0;
+
+            for (float z = -0.5f; z < 0.51f; z += 1)
+            {
+                for (float y = -0.5f; y < 0.51f; y += 1)
+                {
+                    for (float x = -0.5f; x < 0.51f; x += 1)
+                    {
+                        Vector3 corner = new Vector3(x, y, z);
+                        float dist = (eye - corner).Length;
+                        distMin = Math.Min(dist, distMin);
+                        distMax = Math.Max(dist, distMax);
+                    }
+                }
+            }
+
+            return new Vector2(distMin, distMax);
         }
     }
 }

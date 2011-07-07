@@ -30,7 +30,10 @@ namespace VolumeRendererGPU
         float uniformSelectedDepth;
         //Vector2 uniformValueRange;
         Matrix4 uniformCameraToWorld;
-        Matrix4 worldToCamera;
+
+        float uniformRayStepLength = 1.0f;
+        float uniformAttenuationExponent = 1.25f;
+        float uniformAttenuationThreshold = 1e-10f;
 
         string volumeFilenameHead = @"..\..\..\headCT.head";
         string volumeFilenameRaw = @"..\..\..\headCT.raw";
@@ -47,11 +50,7 @@ namespace VolumeRendererGPU
             //worldToCamera = Matrix4.Identity;
             //uniformCameraToWorld = Matrix4.Identity;
 
-            Vector3 eye = 2.0f * new Vector3(
-                    (float)(Math.Sin(0.2) * Math.Cos(0)),
-                    (float)(Math.Sin(0.2) * Math.Sin(0)),
-                    (float)(Math.Cos(0.2)));
-            UpdateCameraTransform(eye);
+            UpdateCameraTransform(MathHelper.PiOver2, MathHelper.Pi);
         }
 
         private VolumeDataSet LoadVolumeDataSet()
@@ -104,6 +103,8 @@ namespace VolumeRendererGPU
             GL.UniformMatrix4(GL.GetUniformLocation(shaderProgram, "cameraToWorld"),
                 false, ref uniformCameraToWorld);
             GL.Uniform2(GL.GetUniformLocation(shaderProgram, "senzorSize"), new Vector2(1.0f, Width / (float)Height));
+
+            uniformRayStepLength = 1.0f / currentVolume.Depth;
 
             Keyboard.KeyUp += KeyUp;
             Mouse.ButtonDown += MouseButtonDown;
@@ -280,6 +281,11 @@ namespace VolumeRendererGPU
             //GL.Uniform2(GL.GetUniformLocation(shaderProgram, "valueRange"), uniformValueRange);
             GL.UniformMatrix4(GL.GetUniformLocation(shaderProgram, "cameraToWorld"),
                 false, ref uniformCameraToWorld);
+            // ray casting parameters
+            GL.Uniform1(GL.GetUniformLocation(shaderProgram, "rayStepLength"), uniformRayStepLength);
+            // Sabella parameters
+            GL.Uniform1(GL.GetUniformLocation(shaderProgram, "attenuationExponent"), uniformAttenuationExponent);
+            GL.Uniform1(GL.GetUniformLocation(shaderProgram, "attenuationThreshold"), uniformAttenuationThreshold);
 
             DrawFullScreenQuad();
 
@@ -331,6 +337,30 @@ Program skeleton - OpenTK Library Examples
                 bool isFullscreen = (WindowState == WindowState.Fullscreen);
                 WindowState = isFullscreen ? WindowState.Normal : WindowState.Fullscreen;
             }
+            else if (e.Key == Key.T)
+            {
+                uniformAttenuationExponent *= 1.01f;
+                Console.WriteLine("uniformAttenuationExponent: {0}", uniformAttenuationExponent);
+            }
+            else if (e.Key == Key.G)
+            {
+                uniformAttenuationExponent /= 1.01f;
+                Console.WriteLine("uniformAttenuationExponent: {0}", uniformAttenuationExponent);
+            }
+            else if (e.Key == Key.Y)
+            {
+                uniformAttenuationThreshold *= 2f;
+                uniformAttenuationThreshold = Math.Min(uniformAttenuationThreshold, 1);
+                uniformAttenuationThreshold = Math.Max(uniformAttenuationThreshold, 0);
+                Console.WriteLine("uniformAttenuationThreshold: {0}", uniformAttenuationThreshold);
+            }
+            else if (e.Key == Key.H)
+            {
+                uniformAttenuationThreshold *= 0.5f;
+                uniformAttenuationThreshold = Math.Min(uniformAttenuationThreshold, 1);
+                uniformAttenuationThreshold = Math.Max(uniformAttenuationThreshold, 0);
+                Console.WriteLine("uniformAttenuationThreshold: {0}", uniformAttenuationThreshold);
+            }
         }
 
         void MouseButtonDown(object sender, MouseButtonEventArgs e)
@@ -366,6 +396,7 @@ Program skeleton - OpenTK Library Examples
                 Console.WriteLine(eyeTheta);
                 // [0; 2 PI]
                 double eyePhi = 2 * Math.PI * (e.X / (float)Width);
+                Console.WriteLine(eyePhi);
                 float eyeRadius = 2.0f;
 
                 //Vector3 eye = eyeRadius * new Vector3(
@@ -380,19 +411,21 @@ Program skeleton - OpenTK Library Examples
                 //worldToCamera *= Matrix4.CreateRotationZ((float)eyePhi);
                 //worldToCamera = Matrix4.Identity;
                 //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
-                uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
-                uniformCameraToWorld *= Matrix4.Scale(new Vector3(1, -1, 1));
-                uniformCameraToWorld *= Matrix4.CreateRotationX((float)eyeTheta);
-                uniformCameraToWorld *= Matrix4.CreateRotationZ((float)eyePhi);
+                UpdateCameraTransform((float)eyeTheta, (float)eyePhi);
             }
             lastX = e.X;
             lastY = e.Y;
         }
 
-        private void UpdateCameraTransform(Vector3 eye)
+        private void UpdateCameraTransform(float eyeTheta, float eyePhi)
         {
-            worldToCamera = Matrix4.LookAt(eye, new Vector3(0.5f, 0.5f, 0.5f), Vector3.UnitY);
-            uniformCameraToWorld = Matrix4.Invert(worldToCamera);
+            //worldToCamera = Matrix4.LookAt(eye, new Vector3(0.5f, 0.5f, 0.5f), Vector3.UnitY);
+            //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
+
+            uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
+            uniformCameraToWorld *= Matrix4.Scale(new Vector3(1, -1, 1));
+            uniformCameraToWorld *= Matrix4.CreateRotationX((float)eyeTheta);
+            uniformCameraToWorld *= Matrix4.CreateRotationZ((float)eyePhi);
         }
 
         #endregion
