@@ -362,7 +362,7 @@ Program skeleton - OpenTK Library Examples
                 uniformSelectedDepth = e.Y / (float)Height;
 
                 // [-PI/2; PI/2]
-                double eyeTheta = Math.PI * (1 - (e.Y / (float)Height));
+                double eyeTheta = Math.PI * ((e.Y / (float)Height));
                 Console.WriteLine(eyeTheta);
                 // [0; 2 PI]
                 double eyePhi = 2 * Math.PI * (e.X / (float)Width);
@@ -381,8 +381,9 @@ Program skeleton - OpenTK Library Examples
                 //worldToCamera = Matrix4.Identity;
                 //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
                 uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
-                uniformCameraToWorld *= Matrix4.CreateRotationX((float)-eyeTheta);
-                uniformCameraToWorld *= Matrix4.CreateRotationZ((float)-eyePhi);
+                uniformCameraToWorld *= Matrix4.Scale(new Vector3(1, -1, 1));
+                uniformCameraToWorld *= Matrix4.CreateRotationX((float)eyeTheta);
+                uniformCameraToWorld *= Matrix4.CreateRotationZ((float)eyePhi);
             }
             lastX = e.X;
             lastY = e.Y;

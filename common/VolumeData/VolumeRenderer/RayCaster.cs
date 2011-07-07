@@ -34,18 +34,53 @@ namespace VolumeRenderer
             {
                 for (int x = 0; x < width; x++)
                 {
-                    float intensity = RayCastVolume(volumeTexture,
+                    Vector3 intensity = RayCastVolume(volumeTexture,
                         new Vector2(x * xyPixelSize.X, y * xyPixelSize.Y),
                         rayStepLength, senzorSize, ref cameraToWorld);
-                    byte value = (byte)(intensity * scaleFactor);
-                    outputImage.SetPixel(x, y, Color.FromArgb(value, value, value));
+                    intensity *= scaleFactor;
+                    outputImage.SetPixel(x, y, Color.FromArgb((int)intensity.X, (int)intensity.Y, (int)intensity.Z));
                 }
             }
 
             return outputImage;
         }
 
-        private static float RayCastVolume(
+        public static Bitmap RenderGlowingFog(VolumeDataSet dataSet, Bitmap outputImage)
+        {
+            int width = 512;
+            int height = 512;
+            if ((outputImage == null) || (outputImage.Width != width)
+                || (outputImage.Height != height))
+            {
+                outputImage = new Bitmap(width, height);
+            }
+
+            var volumeTexture = dataSet.TimeSlices[0];
+
+            float rayStepLength = 1.0f / volumeTexture.Depth;
+            Vector2 xyPixelSize = new Vector2(1 / (float)width, 1 / (float)height);
+            Vector2 senzorSize = new Vector2(1, 1);
+            Matrix4 cameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
+            //cameraToWorld *= Matrix4.CreateRotationY(0f * MathHelper.Pi);
+            //cameraToWorld *= Matrix4.CreateRotationX(-0.5f * MathHelper.Pi);
+            //cameraToWorld *= Matrix4.CreateRotationZ(0.25f * MathHelper.Pi);
+            //.CreateRotationY((float)Math.PI);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector3 color = RayCastVolume(volumeTexture,
+                        new Vector2(x * xyPixelSize.X, y * xyPixelSize.Y),
+                        rayStepLength, senzorSize, ref cameraToWorld);
+                    color *= 255;
+                    outputImage.SetPixel(x, y, Color.FromArgb((int)color.X, (int)color.Y, (int)color.Z));
+                }
+            }
+
+            return outputImage;
+        }
+
+        private static Vector3 RayCastVolume(
             VolumeDataSet.VolumeGrid volumeTexture,
             Vector2 pixelPos, float rayStepLength,
             Vector2 senzorSize, ref Matrix4 cameraToWorld)
@@ -69,19 +104,47 @@ namespace VolumeRenderer
             Vector3 position = rayStart;
             Vector3 rayStep = rayStepLength * Vector3.Normalize(rayDirection);
             int stepCount = (int)((rayEnd - rayStart).Length / rayStepLength);
-            float colorAccum = 0;
-            float maxIntensity = 0;
+
+            // attenuation exponent
+            double tau = 3.0;
+
+            float maxDensity = float.NegativeInfinity;
+            int maxPosition = 0; // position of max density
+            float attenuation = 1; // accumulator
+            float prevIntensity = 0;
+            float intensity = 0;
+            float thickness = 1;// rayStepLength;
+
+            float scalingFactor = 1 / 4095.0f;
             for (int i = 0; i < stepCount; i += 1)
             {
-                float intensity = Texture3D(volumeTexture, position);
+                float density = Texture3D(volumeTexture, position) * scalingFactor;
 
-                maxIntensity = Math.Max(intensity, maxIntensity);
-                //colorAccum += intensity;
+                if (density >= maxDensity)
+                {
+                    maxDensity = density;
+                    maxPosition = i;
+                }
+                float sliceIntensity = density * thickness;
+                float sliceAttenuation = (float)Math.Exp(-tau * prevIntensity);
+                attenuation *= sliceAttenuation;
+                intensity += sliceIntensity * attenuation;
+                prevIntensity = sliceIntensity;
+                if (attenuation < 0.01)
+                {
+                    break;
+                }
 
                 position += rayStep;
             }
-            colorAccum = maxIntensity;
-            return colorAccum;
+
+            double maxPositionNormalized = maxPosition / (float)(stepCount - 1);
+            intensity = Math.Min(intensity, 1);
+
+            Vector3 color = SliceCollector.HsvToRgbColorVector3(1 - maxDensity,
+                1 - maxPositionNormalized, intensity);
+
+            return color;
 
             // TODO:
             // - input:

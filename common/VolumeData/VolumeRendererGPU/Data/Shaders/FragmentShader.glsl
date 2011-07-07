@@ -70,7 +70,7 @@ vec4 averageAlongRay(vec3 origin, vec3 directionStep, int count) {
 
 // pixelPos - pixel position in normalized device space [0; 1]^2
 // rayStepLength - step for ray marching (in world space units)
-vec4 rayCastVolume(vec2 pixelPos, float rayStepLength) {
+vec4 rayCastVolumeMIP(vec2 pixelPos, float rayStepLength) {
 	// senzor position in camera space
 	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
 	// TODO: use a matrix (ndcToCamera)
@@ -132,6 +132,88 @@ vec4 rayCastVolume(vec2 pixelPos, float rayStepLength) {
 	//   - return the accumulated color
 }
 
+
+vec3 hsvToRgbColor(float hue, float saturation, float value) {
+	float chroma = value * saturation;
+    float h = 6 * hue;
+    float  x = chroma * (1 - abs(mod(h, 2.0) - 1));
+    float  r1 = 0;
+    float  g1 = 0;
+    float  b1 = 0;
+    switch (int(floor(h)))
+    {
+        case 0: r1 = chroma; g1 = x; break;
+        case 1: r1 = x; g1 = chroma; break;
+        case 2: g1 = chroma; b1 = x; break;
+        case 3: g1 = x; b1 = chroma; break;
+        case 4: r1 = chroma; b1 = x; break;
+        case 5: r1 = x; b1 = chroma; break;
+        default: break;
+    }
+    float m = value - chroma;
+    float r = r1 + m;
+    float g = g1 + m;
+    float b = b1 + m;
+    return vec3(r, g, b);
+}
+
+vec4 rayCastVolumeGlowingFog(vec2 pixelPos, float rayStepLength) {
+	// senzor position in camera space
+	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
+	// TODO: use a matrix (ndcToCamera)
+	vec2 senzorPos = senzorSize * (pixelPos - vec2(0.5, 0.5));
+	// ray origin in world space
+	vec3 rayOrigin = (cameraToWorld * vec4(senzorPos, 0.0, 1.0)).xyz;
+	// case of orthogonal projection
+	vec3 rayDirection = (cameraToWorld * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
+	
+	// clip the ray by the volume cube [0;1]^3 to a line segment
+	// TODO
+	
+	vec3 rayStart = rayOrigin;
+	vec3 rayEnd = rayOrigin + 1 * rayDirection;
+	
+	vec3 position = rayStart;
+	vec3 rayStep = rayStepLength * normalize(rayDirection);
+	int stepCount = int(length(rayEnd - rayStart) / rayStepLength);
+	
+	// attenuation exponent
+    float tau = 3.0;
+
+    float maxDensity = 0;
+    int maxPosition = 0; // position of max density
+    float attenuation = 1; // accumulator
+    float prevIntensity = 0;
+    float intensity = 0;
+    float thickness = 1;// rayStepLength;
+    float attenuationThreshold = 0.01;
+	
+	for (int i = 0; i < stepCount; i += 1) {
+		float density = texture3D(volumeTexture, position + vec3(0.5, 0.5, 0.5)).r;
+		
+        if (density >= maxDensity)
+        {
+            maxDensity = density;
+            maxPosition = i;
+        }
+        float sliceIntensity = density * thickness;
+        float sliceAttenuation = exp(-tau * prevIntensity);
+        attenuation *= sliceAttenuation;
+        intensity += sliceIntensity * attenuation;
+        prevIntensity = sliceIntensity;
+        if (attenuation < attenuationThreshold)
+        {
+            break;
+        }
+
+		position += rayStep;
+	}
+	float maxPositionNormalized = maxPosition / float(stepCount - 1);
+    intensity = min(intensity, 1.0);
+
+    return vec4(hsvToRgbColor(1 - maxDensity, 1 - maxPositionNormalized, intensity), 1);
+}
+
 void main() {
 	//vec3 color = getOrthogonalSlice();
 	//vec3 color = maxIntensityProjAlongZ();
@@ -148,8 +230,9 @@ void main() {
 	//directionStep = (cameraToWorld * vec4(directionStep, 1)).xyz;
 	//vec3 color = averageAlongRay(origin, directionStep, count);
 	
-	//vec3 color = rayCastVolume(gl_TexCoord[0].st, 1/(float)305).rgb;
-	vec3 color = rayCastVolume(gl_TexCoord[0].st, 0.01).rgb;
+	//vec3 color = rayCastVolumeMIP(gl_TexCoord[0].st, 1.0/305.0).rgb;
+	//vec3 color = rayCastVolume(gl_TexCoord[0].st, 0.01).rgb;
+	vec3 color = rayCastVolumeGlowingFog(gl_TexCoord[0].st, 1.0/305.0).rgb;
 	
 	gl_FragColor = vec4(color.rgb, 1);
 }

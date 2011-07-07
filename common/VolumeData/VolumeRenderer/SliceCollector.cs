@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using VolumeData;
+using OpenTK;
 
 namespace VolumeRenderer
 {
@@ -150,7 +151,8 @@ namespace VolumeRenderer
 
             int xyIndex = 0;
             int zStep = width * height * channels;
-            double thickness = dataSet.VoxelSize[2];
+            //double thickness = dataSet.VoxelSize[2];
+            double thickness = 1;
             double scaleFactor = 1 / 4095.0;
             for (int y = 0; y < height; y++)
             {
@@ -184,10 +186,14 @@ namespace VolumeRenderer
                     }
 
                     // [depth - 1; 0] -> [0; 1]
-                    double maxPositionNormalized = 1 - (maxPosition / (double)depth);
+                    double maxPositionNormalized = maxPosition / (double)(depth - 1);
                     intensity = Math.Min(intensity, 1);
 
-                    Color color = HsvToRgbColor(1 - maxDensity, maxPositionNormalized, intensity);
+                    // max. density -> hue
+                    // max. density position -> saturation
+                    // intensity -> value
+                    Color color = HsvToRgbColor(1 - maxDensity, 1 - maxPositionNormalized,
+                        intensity);
                     outputImage.SetPixel(x, y, color);
                     xyIndex += channels;
                 }
@@ -205,7 +211,7 @@ namespace VolumeRenderer
         /// <param name="saturation">[0;1]</param>
         /// <param name="value">[0;1]</param>
         /// <returns></returns>
-        private static Color HsvToRgbColor(double hue, double saturation, double value)
+        public static Vector3 HsvToRgbColorVector3(double hue, double saturation, double value)
         {
             Debug.Assert(hue >= 0);
             Debug.Assert(hue <= 1);
@@ -234,7 +240,14 @@ namespace VolumeRenderer
             double r = r1 + m;
             double g = g1 + m;
             double b = b1 + m;
-            return Color.FromArgb((int)(255 * r), (int)(255 * g), (int)(255 * b));
+            return new Vector3((float)r, (float)g, (float)b);
+        }
+
+        public static Color HsvToRgbColor(double hue, double saturation, double value)
+        {
+            Vector3 color = HsvToRgbColorVector3(hue, saturation, value);
+            color *= 255;
+            return Color.FromArgb((int)color.X, (int)color.Y, (int)color.Z);
         }
     }
 }
