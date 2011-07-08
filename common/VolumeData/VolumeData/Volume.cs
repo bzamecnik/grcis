@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace VolumeData
 {
@@ -176,6 +177,90 @@ namespace VolumeData
 
         public static VolumeDataSet LoadFromFile(string headFile, string rawFile, bool readOnlyHeader)
         {
+            VolumeDataSet dataSet = LoadDataSetHeader(headFile, readOnlyHeader);
+
+            if (!readOnlyHeader)
+            {
+                bool gzipped = rawFile.EndsWith(".gz");
+                using (FileStream fs = new FileStream(rawFile, FileMode.Open))
+                {
+                    Stream stream = new BufferedStream(fs, 32 * 1024);
+                    if (gzipped)
+                    {
+                        stream = new GZipStream(stream, CompressionMode.Decompress);
+                    }
+                    using (BinaryReader reader = new BinaryReader(stream))
+                    {
+                        var valueReadFunc = GetReaderFuncToFloat(dataSet.VoxelValueType, reader);
+                        for (int time = 0; time < dataSet.TimeSize; time++)
+                        {
+                            VolumeGrid.LoadFromReader(reader, valueReadFunc,
+                                ref dataSet.TimeSlices[time]);
+                        }
+                    }
+                }
+            }
+
+            return dataSet;
+        }
+
+        ///// <summary>
+        ///// Load the volue data set metadata and load volume data into a texture buffer.
+        ///// </summary>
+        ///// <remarks>
+        ///// Load first first time slice.
+        ///// </remarks>
+        ///// <param name="headFile"></param>
+        ///// <param name="rawFile"></param>
+        ///// <param name="readOnlyHeader"></param>
+        ///// <param name="textureData"></param>
+        ///// <returns></returns>
+        //public static VolumeDataSet LoadFromFileToTexture3d(
+        //    string headFile, string rawFile, out IntPtr textureData, float scale)
+        //{
+        //    VolumeDataSet dataSet = LoadDataSetHeader(headFile, true);
+
+        //    if (dataSet.VoxelValueType != typeof(UInt16))
+        //    {
+        //        throw new NotImplementedException();
+        //    }
+
+        //    int width = dataSet.Size[0];
+        //    int height = dataSet.Size[1];
+        //    int depth = dataSet.Size[2];
+        //    int channels = dataSet.ChannelCount;
+        //    textureData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(float)) * width * height * depth * channels);
+
+        //    bool gzipped = rawFile.EndsWith(".gz");
+        //    using (FileStream fs = new FileStream(rawFile, FileMode.Open))
+        //    {
+        //        Stream stream = new BufferedStream(fs, 32 * 1024);
+        //        if (gzipped)
+        //        {
+        //            stream = new GZipStream(stream, CompressionMode.Decompress);
+        //        }
+        //        using (BinaryReader reader = new BinaryReader(stream))
+        //        {
+        //            unsafe
+        //            {
+        //                float* volumeDataPtr = (float*)textureData;
+        //                int index = 0;
+        //                for (int z = 0; z < depth; z++)
+        //                    for (int y = 0; y < height; y++)
+        //                        for (int x = 0; x < width; x++)
+        //                            for (int channel = 0; channel < channels; channel++)
+        //                            {
+        //                                volumeDataPtr[index] = (float)reader.ReadUInt16() * scale;
+        //                                index++;
+        //                            }
+        //            }
+        //        }
+        //    }
+        //    return dataSet;
+        //}
+
+        private static VolumeDataSet LoadDataSetHeader(string headFile, bool readOnlyHeader)
+        {
             VolumeDataSet dataSet;
             using (StreamReader sr = new StreamReader(headFile))
             {
@@ -234,29 +319,6 @@ namespace VolumeData
                 dimension, size, timeSize, channelCount, bitsPerChannel,
                 voxelValueType, voxelSize, voxelTimeSize, !readOnlyHeader);
             }
-
-            if (!readOnlyHeader)
-            {
-                bool gzipped = rawFile.EndsWith(".gz");
-                using (FileStream fs = new FileStream(rawFile, FileMode.Open))
-                {
-                    Stream stream = new BufferedStream(fs, 32 * 1024);
-                    if (gzipped)
-                    {
-                        stream = new GZipStream(stream, CompressionMode.Decompress);
-                    }
-                    using (BinaryReader reader = new BinaryReader(stream))
-                    {
-                        var valueReadFunc = GetReaderFuncToDouble(dataSet.VoxelValueType, reader);
-                        for (int time = 0; time < dataSet.TimeSize; time++)
-                        {
-                            VolumeGrid.LoadFromReader(reader, valueReadFunc,
-                                ref dataSet.TimeSlices[time]);
-                        }
-                    }
-                }
-            }
-
             return dataSet;
         }
 
@@ -282,20 +344,20 @@ namespace VolumeData
             return possibleTypes.ElementAt(0);
         }
 
-        public static Func<BinaryReader, double> GetReaderFuncToDouble(Type inputType, BinaryReader reader)
+        public static Func<BinaryReader, float> GetReaderFuncToFloat(Type inputType, BinaryReader reader)
         {
             switch (inputType.Name)
             {
-                case "Byte": return (r) => (double)r.ReadByte();
-                case "SByte": return (r) => (double)r.ReadSByte();
-                case "UInt16": return (r) => (double)r.ReadUInt16();
-                case "Int16": return (r) => (double)r.ReadInt16();
-                case "UInt32": return (r) => (double)r.ReadUInt32();
-                case "Int32": return (r) => (double)r.ReadInt32();
-                case "UInt64": return (r) => (double)r.ReadUInt64();
-                case "Int64": return (r) => (double)r.ReadInt64();
-                case "Single": return (r) => (double)r.ReadSingle();
-                case "Double": return (r) => (double)r.ReadDouble();
+                case "Byte": return (r) => (float)r.ReadByte();
+                case "SByte": return (r) => (float)r.ReadSByte();
+                case "UInt16": return (r) => (float)r.ReadUInt16();
+                case "Int16": return (r) => (float)r.ReadInt16();
+                case "UInt32": return (r) => (float)r.ReadUInt32();
+                case "Int32": return (r) => (float)r.ReadInt32();
+                case "UInt64": return (r) => (float)r.ReadUInt64();
+                case "Int64": return (r) => (float)r.ReadInt64();
+                case "Single": return (r) => (float)r.ReadSingle();
+                case "Double": return (r) => (float)r.ReadDouble();
                 default: throw new NotImplementedException();
             }
         }
@@ -305,13 +367,13 @@ namespace VolumeData
             /// <summary>
             /// Volume 3D table, possibly with vector values.
             /// </summary>
-            public double[] Values { get; private set; }
+            public float[] Values { get; set; }
             public int Width { get; private set; }
             public int Height { get; private set; }
             public int Depth { get; private set; }
             public int ChannelCount { get; private set; }
 
-            public double this[int x, int y, int z, int channel]
+            public float this[int x, int y, int z, int channel]
             {
                 get
                 {
@@ -337,13 +399,13 @@ namespace VolumeData
                 Depth = size[2];
                 ChannelCount = channelCount;
                 //Stopwatch sw = Stopwatch.StartNew();
-                Values = new double[Width * Height * Depth * channelCount];
+                Values = new float[Width * Height * Depth * channelCount];
                 //sw.Stop();
                 //Console.WriteLine("allocated {0}x{1}x{2}x{3} doubles in {4} ms",
                 //    Width, Height, Depth, channelCount, sw.ElapsedMilliseconds);
             }
 
-            public static VolumeGrid LoadFromReader(BinaryReader reader, Func<BinaryReader, double> readFunc, ref VolumeGrid volumeGrid)
+            public static VolumeGrid LoadFromReader(BinaryReader reader, Func<BinaryReader, float> readFunc, ref VolumeGrid volumeGrid)
             {
                 var values = volumeGrid.Values;
                 int depth = volumeGrid.Depth;
@@ -362,7 +424,7 @@ namespace VolumeData
                 return volumeGrid;
             }
 
-            public Bitmap DepthSliceToBitmap(int z, Func<double[], Color> colorFunc)
+            public Bitmap DepthSliceToBitmap(int z, Func<float[], Color> colorFunc)
             {
                 Bitmap bitmap = new Bitmap(Width, Height);
                 int index = z * Width * Height * ChannelCount;
@@ -370,7 +432,7 @@ namespace VolumeData
                 {
                     for (int x = 0; x < Width; x++)
                     {
-                        double[] value = new double[ChannelCount];
+                        float[] value = new float[ChannelCount];
                         for (int channel = 0; channel < ChannelCount; channel++)
                         {
                             value[channel] = Values[index];

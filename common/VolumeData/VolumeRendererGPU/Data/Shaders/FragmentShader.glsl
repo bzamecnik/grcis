@@ -1,28 +1,46 @@
 ﻿#extension GL_EXT_gpu_shader4 : enable
 
 uniform sampler3D volumeTexture;
-uniform float selectedDepth; // [0;1]
 uniform float depth; // size of the volume (in pixels)
-//uniform vec2 valueRange;
 uniform mat4 cameraToWorld;
 
 uniform vec2 senzorSize;
 
+// slice parameters:
+uniform float selectedDepth; // [0;1]
+
+// ray casting parameters:
+
 //step for ray marching (in world space units)
 uniform float rayStepLength;
+
+// glowing fog (Sabella) parameters:
+
 // attenuation exponent tau
 uniform float attenuationExponent;
 uniform float attenuationThreshold;
 
-vec4 getOrthogonalSlice() {
+vec4 getOrthogonalSliceTop() {
 	float z = clamp(selectedDepth, 0.0, 1.0);
-	// top view:
+	// top view
 	vec4 color = texture3D(volumeTexture, vec3(gl_TexCoord[0].st, z));
-	// front view:
-	//vec4 color = texture3D(volumeTexture, vec3(gl_TexCoord[0].s, 1-z, 1-gl_TexCoord[0].t));
-	// side view:
-	//vec4 color = texture3D(volumeTexture, vec3(z, gl_TexCoord[0].s, 1-gl_TexCoord[0].t));
-	//color = color / (valueRange.t - valueRange.s) + valueRange.s;
+	color.a = 1;
+	return color;
+}
+
+vec4 getOrthogonalSliceFront() {
+	float z = clamp(selectedDepth, 0.0, 1.0);
+	// front view
+	vec4 color = texture3D(volumeTexture, vec3(gl_TexCoord[0].s, 1-z, 1-gl_TexCoord[0].t));
+	color.a = 1;
+	return color;
+}
+
+vec4 getOrthogonalSliceSide() {
+	float z = clamp(selectedDepth, 0.0, 1.0);
+	// side view
+	vec4 color = texture3D(volumeTexture, vec3(z, gl_TexCoord[0].s, 1-gl_TexCoord[0].t));
+	color.a = 1;
 	return color;
 }
 
@@ -74,8 +92,9 @@ vec4 averageAlongRay(vec3 origin, vec3 directionStep, int count) {
 	//}    
     //vec3 intersectionPos = rayOrigin + t * rayDir;
 
-// pixelPos - pixel position in normalized device space [0; 1]^2
-vec4 rayCastVolumeMIP(vec2 pixelPos) {
+vec4 rayCastVolumeMIP() {
+	// pixel position in normalized device space [0; 1]^2
+	vec2 pixelPos = gl_TexCoord[0].st;
 	// senzor position in camera space
 	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
 	// TODO: use a matrix (ndcToCamera)
@@ -94,22 +113,16 @@ vec4 rayCastVolumeMIP(vec2 pixelPos) {
 	vec3 position = rayStart;
 	vec3 rayStep = rayStepLength * normalize(rayDirection);
 	int stepCount = int(length(rayEnd - rayStart) / rayStepLength);
-	vec4 colorAccum = vec4(0, 0, 0, 0);
 	float maxIntensity = 0;
 	for (int i = 0; i < stepCount; i += 1) {
 		float intensity = texture3D(volumeTexture, position + vec3(0.5, 0.5, 0.5)).r;
 		
 		maxIntensity = max(intensity, maxIntensity);
-		//colorAccum.rgb += intensity;
 		
 		position += rayStep;
 	}
-	colorAccum.rgb = maxIntensity;
-	//colorAccum.rgb /= (float)stepCount;
-	colorAccum.a = 1;
-	return colorAccum;
+	return vec4(vec3(maxIntensity), 1);
 	
-	// TODO:
 	// - input:
 	//    - pixel position on senzor [0;1]^2
 	//    - constant:
@@ -137,6 +150,39 @@ vec4 rayCastVolumeMIP(vec2 pixelPos) {
 	//   - return the accumulated color
 }
 
+vec4 rayCastVolumeAverage() {
+	// pixel position in normalized device space [0; 1]^2
+	vec2 pixelPos = gl_TexCoord[0].st;
+	// senzor position in camera space
+	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
+	// TODO: use a matrix (ndcToCamera)
+	vec2 senzorPos = senzorSize * (pixelPos - vec2(0.5, 0.5));
+	// ray origin in world space
+	vec3 rayOrigin = (cameraToWorld * vec4(senzorPos, 0.0, 1.0)).xyz;
+	// case of orthogonal projection
+	vec3 rayDirection = (cameraToWorld * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
+	
+	// clip the ray by the volume cube [0;1]^3 to a line segment
+	// TODO
+	
+	vec3 rayStart = rayOrigin;
+	vec3 rayEnd = rayOrigin + 1 * rayDirection;
+	
+	vec3 position = rayStart;
+	vec3 rayStep = rayStepLength * normalize(rayDirection);
+	int stepCount = int(length(rayEnd - rayStart) / rayStepLength);
+	vec4 colorAccum = vec4(0, 0, 0, 0);
+	for (int i = 0; i < stepCount; i += 1) {
+		float intensity = texture3D(volumeTexture, position + vec3(0.5, 0.5, 0.5)).r;
+		
+		colorAccum.rgb += intensity;
+		
+		position += rayStep;
+	}
+	colorAccum.rgb /= (float)stepCount;
+	colorAccum.a = 1;
+	return colorAccum;
+}
 
 vec3 hsvToRgbColor(float hue, float saturation, float value) {
 	float chroma = value * saturation;
@@ -180,7 +226,8 @@ vec2 getCubeDistanceExtrema(vec3 eye) {
 	return vec2(distMin, distMax);
 }
 
-vec4 rayCastVolumeGlowingFog(vec2 pixelPos) {
+vec4 rayCastVolumeGlowingFog() {
+	vec2 pixelPos = gl_TexCoord[0].st;
 	// senzor position in camera space
 	// map from [0; 1]^2 to [-w/2;w/2]x[-h/2;h/2]
 	// TODO: use a matrix (ndcToCamera)
@@ -194,7 +241,7 @@ vec4 rayCastVolumeGlowingFog(vec2 pixelPos) {
 	// TODO
 	
 	vec3 rayStart = rayOrigin;
-	vec3 rayEnd = rayOrigin + 1 * rayDirection;
+	vec3 rayEnd = rayOrigin + 2 * rayDirection;
 	
 	vec3 position = rayStart;
 	vec3 rayStep = rayStepLength * normalize(rayDirection);
@@ -227,32 +274,25 @@ vec4 rayCastVolumeGlowingFog(vec2 pixelPos) {
 
 		position += rayStep;
 	}
-	vec2 distanceExtrema = getCubeDistanceExtrema(rayStart);
-	float maxPositionNormalized = (length(maxPosition - rayStart) - distanceExtrema.x) / (distanceExtrema.y - distanceExtrema.x);
+	//vec2 distanceExtrema = getCubeDistanceExtrema(rayStart);
+	//float maxPositionNormalized = (length(maxPosition - rayStart) - distanceExtrema.x) / (distanceExtrema.y - distanceExtrema.x);
+	float maxPositionNormalized = (length(maxPosition - rayStart)) / length(rayEnd - rayStart);
     intensity = min(intensity, 1.0);
 
     return vec4(hsvToRgbColor(1 - maxDensity, 1 - maxPositionNormalized, intensity), 1);
+    //return vec4(vec3(intensity), 1);
+    //return vec4(vec3(1 - maxPositionNormalized), 1);
 }
 
 void main() {
-	//vec3 color = getOrthogonalSlice();
-	//vec3 color = maxIntensityProjAlongZ();
+	//// orthographic views front any axis-oriented angles
+	//gl_FragColor = getOrthogonalSliceTop();
+	//gl_FragColor = getOrthogonalSliceFront();
+	//gl_FragColor = getOrthogonalSliceSide();
+	//gl_FragColor = maxIntensityProjAlongZ();
 	
-	////vec3 from = vec3(0, 0, 0);
-	////vec3 to = vec3(0, 0, 1);
-	////vec3 count = depth;
-	//vec3 count = 50;
-	//////vec3 directionStep = (to - from) / float(count - 1);
-	//vec3 origin = vec3(gl_TexCoord[0].st - vec2(0.5, 0.5), 0);
-	////vec3 directionStep = vec3(0, 0, 1) / float(count - 1);
-	//vec3 directionStep = vec3(0, 0, 1) / float(count - 1);
-	//origin = (cameraToWorld * vec4(origin, 1)).xyz;
-	//directionStep = (cameraToWorld * vec4(directionStep, 1)).xyz;
-	//vec3 color = averageAlongRay(origin, directionStep, count);
-	
-	//vec3 color = rayCastVolumeMIP(gl_TexCoord[0].st, 1.0/305.0).rgb;
-	//vec3 color = rayCastVolume(gl_TexCoord[0].st, 0.01).rgb;
-	vec3 color = rayCastVolumeGlowingFog(gl_TexCoord[0].st).rgb;
-	
-	gl_FragColor = vec4(color.rgb, 1);
+	//// orthographic views front any angle
+	//gl_FragColor = rayCastVolumeMIP();
+	//gl_FragColor = rayCastVolumeAverage();
+	gl_FragColor = rayCastVolumeGlowingFog();
 }

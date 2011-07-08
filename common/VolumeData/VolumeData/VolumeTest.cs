@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
 
 namespace VolumeData
 {
@@ -76,6 +77,17 @@ namespace VolumeData
                     (int)(value[0] / 255.0)));
             image.Save(string.Format("headCT_{0}.png", z));
         }
+
+        //private void TestLoadTexture3D()
+        //{
+        //    IntPtr volumeTexture3d;
+        //    Stopwatch sw = Stopwatch.StartNew();
+        //    var dataSet = VolumeDataSet.LoadFromFileToTexture3d(
+        //        @"..\..\..\headCT.head", @"..\..\..\headCT.raw.gz",
+        //        out volumeTexture3d, 1.0f);
+        //    sw.Stop();
+        //    Console.WriteLine("Loaded volume to 3D texture in {0} ms", sw.ElapsedMilliseconds);
+        //}
 
         private void FindChannelMinAndMax(VolumeDataSet.VolumeGrid grid, int channel,
             out double min, out double max)

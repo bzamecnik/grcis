@@ -1,4 +1,4 @@
-#region --- License ---
+#region --- License of the OpenTK skeleton application ---
 /* Licensed under the MIT/X11 license.
  * Copyright (c) 2006-2008 the OpenTK Team.
  * This notice may not be removed from any source distribution.
@@ -28,15 +28,16 @@ namespace VolumeRendererGPU
 
         float uniformDepth;
         float uniformSelectedDepth;
-        //Vector2 uniformValueRange;
         Matrix4 uniformCameraToWorld;
 
         float uniformRayStepLength = 1.0f;
         float uniformAttenuationExponent = 1.25f;
         float uniformAttenuationThreshold = 1e-10f;
 
-        string volumeFilenameHead = @"..\..\..\headCT.head";
-        string volumeFilenameRaw = @"..\..\..\headCT.raw";
+        //string volumeFilenameHead = @"..\..\..\headCT.head";
+        //string volumeFilenameRaw = @"..\..\..\headCT.raw";
+        string volumeFilenameHead = @"..\..\..\fullHeadCT.head";
+        string volumeFilenameRaw = @"..\..\..\fullHeadCT.raw";
 
         int vertexShaderObject, fragmentShaderObject, shaderProgram;
 
@@ -47,9 +48,6 @@ namespace VolumeRendererGPU
         public VolumeRendererForm()
             : base(512, 512)
         {
-            //worldToCamera = Matrix4.Identity;
-            //uniformCameraToWorld = Matrix4.Identity;
-
             UpdateCameraTransform(MathHelper.PiOver2, MathHelper.Pi);
         }
 
@@ -74,7 +72,6 @@ namespace VolumeRendererGPU
 
         protected override void OnLoad(EventArgs e)
         {
-            //GL.Enable(EnableCap.Texture2D);
             GL.Enable(EnableCap.Texture3DExt);
 
             using (StreamReader vs = new StreamReader("Data/Shaders/VertexShader.glsl"))
@@ -88,6 +85,10 @@ namespace VolumeRendererGPU
             volumeDataSet = LoadVolumeDataSet();
             currentVolume = volumeDataSet.TimeSlices[0];
             volume3dTexture = LoadVolumeSliceTexture();
+            // Volume data are now in a GPU texture are are no longer in main memory.
+            // Assume that the data will not be needed on CPU anymore.
+            currentVolume.Values = null;
+            GC.Collect();
 
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture3D, volume3dTexture);
@@ -104,7 +105,7 @@ namespace VolumeRendererGPU
                 false, ref uniformCameraToWorld);
             GL.Uniform2(GL.GetUniformLocation(shaderProgram, "senzorSize"), new Vector2(1.0f, Width / (float)Height));
 
-            uniformRayStepLength = 1.0f / currentVolume.Depth;
+            uniformRayStepLength = 1.0f / volumeDataSet.Size[2];
 
             Keyboard.KeyUp += KeyUp;
             Mouse.ButtonDown += MouseButtonDown;
@@ -161,36 +162,24 @@ namespace VolumeRendererGPU
             int height = volumeDataSet.Size[1];
             int depth = volumeDataSet.Size[2];
 
-            //int width = 20;
-            //int height = 30;
-            //int depth = 40;
-
             // convert currentVolume from double[,,] to float[]* volumeData
             IntPtr volumeData = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(float)) * width * height * depth);
-            //float minValue = float.PositiveInfinity;
-            //float maxValue = float.NegativeInfinity;
-
             Stopwatch sw = Stopwatch.StartNew();
 
             unsafe
             {
                 int rowIndex = 0;
-                float scale = 1 / 4095.0f;
+                float scale = 1 / 4095.0f; // normalization of CT data
                 var values = currentVolume.Values;
                 for (int z = 0; z < depth; z++)
                 {
                     for (int y = 0; y < height; y++)
                     {
-                        //float* row = (float*)volumeData + width * (height * z + y);
                         float* row = (float*)volumeData + rowIndex;
                         for (int x = 0; x < width; x++)
                         {
-                            //float value = (float)currentVolume[x, y, z, 0];
                             float value = (float)currentVolume.Values[rowIndex + x];
-                            //minValue = Math.Min(value, minValue);
-                            //maxValue = Math.Max(value, maxValue);
                             row[x] = value * scale;
-                            //row[x] = (float)random.NextDouble();
                         }
                         rowIndex += width;
                     }
@@ -198,7 +187,6 @@ namespace VolumeRendererGPU
                 sw.Stop();
                 Console.WriteLine("Converted volume to 3D texture in {0} ms", sw.ElapsedMilliseconds);
             }
-            //uniformValueRange = new Vector2(minValue, maxValue);
 
             int textureId = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, textureId);
@@ -213,8 +201,8 @@ namespace VolumeRendererGPU
             sw.Stop();
             Console.WriteLine("Uploaded 3D volume texture to GPU in {0} ms", sw.ElapsedMilliseconds);
 
-            // TODO: delete volumeData if needed
-            //Marshal.FreeHGlobal(volumeData);
+            // we can safely delete the volumeData as it was copied to texture memory
+            Marshal.FreeHGlobal(volumeData);
 
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
@@ -278,7 +266,6 @@ namespace VolumeRendererGPU
             // pass uniforms (which are modified) here
             GL.Uniform1(GL.GetUniformLocation(shaderProgram, "depth"), uniformDepth);
             GL.Uniform1(GL.GetUniformLocation(shaderProgram, "selectedDepth"), uniformSelectedDepth);
-            //GL.Uniform2(GL.GetUniformLocation(shaderProgram, "valueRange"), uniformValueRange);
             GL.UniformMatrix4(GL.GetUniformLocation(shaderProgram, "cameraToWorld"),
                 false, ref uniformCameraToWorld);
             // ray casting parameters
@@ -391,26 +378,11 @@ Program skeleton - OpenTK Library Examples
                 //UniformImageLayerDepth *= (float)Math.Exp(0.005 * (e.Y - lastY));
                 uniformSelectedDepth = e.Y / (float)Height;
 
-                // [-PI/2; PI/2]
+                // [0; PI]
                 double eyeTheta = Math.PI * ((e.Y / (float)Height));
-                Console.WriteLine(eyeTheta);
                 // [0; 2 PI]
                 double eyePhi = 2 * Math.PI * (e.X / (float)Width);
-                Console.WriteLine(eyePhi);
-                float eyeRadius = 2.0f;
 
-                //Vector3 eye = eyeRadius * new Vector3(
-                //    (float)(Math.Cos(eyeTheta) * Math.Cos(eyePhi)),
-                //    (float)(Math.Cos(eyeTheta) * Math.Sin(eyePhi)),
-                //    (float)(Math.Sin(eyeTheta)));
-                //UpdateCameraTransform(eye);
-
-                //worldToCamera = Matrix4.CreateTranslation(new Vector3(0, 0, -eyeRadius));
-                //worldToCamera = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
-                //worldToCamera *= Matrix4.CreateRotationX((float)eyeTheta);
-                //worldToCamera *= Matrix4.CreateRotationZ((float)eyePhi);
-                //worldToCamera = Matrix4.Identity;
-                //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
                 UpdateCameraTransform((float)eyeTheta, (float)eyePhi);
             }
             lastX = e.X;
@@ -419,10 +391,7 @@ Program skeleton - OpenTK Library Examples
 
         private void UpdateCameraTransform(float eyeTheta, float eyePhi)
         {
-            //worldToCamera = Matrix4.LookAt(eye, new Vector3(0.5f, 0.5f, 0.5f), Vector3.UnitY);
-            //uniformCameraToWorld = Matrix4.Invert(worldToCamera);
-
-            uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.5f));
+            uniformCameraToWorld = Matrix4.CreateTranslation(new Vector3(0, 0, -0.75f));
             uniformCameraToWorld *= Matrix4.Scale(new Vector3(1, -1, 1));
             uniformCameraToWorld *= Matrix4.CreateRotationX((float)eyeTheta);
             uniformCameraToWorld *= Matrix4.CreateRotationZ((float)eyePhi);

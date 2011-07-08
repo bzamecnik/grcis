@@ -5,6 +5,7 @@ using System.Text;
 using System.Drawing;
 using VolumeData;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace VolumeRenderer
 {
